@@ -1,0 +1,545 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Waslah — وصلة</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- Sidebar -->
+      <nav class="sidebar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <div class="brand-text">
+            <strong>Waslah</strong>
+            <small data-i18n="brand.tagline">وصلة SSH</small>
+          </div>
+        </div>
+
+        <ul class="nav-list">
+          <li class="nav-item active" data-page="dashboard">
+            <span class="nav-ico">⌁</span>
+            <span data-i18n="nav.dashboard">الاتصال</span>
+          </li>
+          <li class="nav-item" data-page="profiles">
+            <span class="nav-ico">▤</span>
+            <span data-i18n="nav.profiles">البروفايلات</span>
+          </li>
+          <li class="nav-item" data-page="logs">
+            <span class="nav-ico">▥</span>
+            <span data-i18n="nav.logs">السجل</span>
+          </li>
+          <li class="nav-item" data-page="settings">
+            <span class="nav-ico">⚙</span>
+            <span data-i18n="nav.settings">الإعدادات</span>
+          </li>
+          <li class="nav-item" data-page="about">
+            <span class="nav-ico">⌘</span>
+            <span data-i18n="nav.about">عن المطوّر</span>
+          </li>
+        </ul>
+
+        <div class="sidebar-footer">
+          <div
+            class="lang-switch"
+            id="langSwitch"
+            role="group"
+            aria-label="Language"
+          >
+            <button class="lang-btn" data-lang="ar">AR</button>
+            <button class="lang-btn" data-lang="en">EN</button>
+          </div>
+
+          <div class="status-pill" id="globalStatusPill">
+            <span class="dot" id="globalStatusDot"></span>
+            <span id="globalStatusText">مش متصل</span>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Main -->
+      <main class="content">
+        <!-- DASHBOARD -->
+        <section class="page active" id="page-dashboard">
+          <header class="page-head">
+            <h1 data-i18n="dashboard.title">الاتصال</h1>
+            <p class="muted" data-i18n="dashboard.subtitle">
+              اختار بروفايل وابدأ النفق
+            </p>
+          </header>
+
+          <div class="dashboard-grid">
+            <div class="card profile-picker">
+              <label class="field-label" data-i18n="dashboard.profileLabel"
+                >البروفايل</label
+              >
+              <select id="profileSelect" class="select"></select>
+
+              <div class="profile-meta" id="profileMeta"></div>
+
+              <button class="btn btn-primary btn-block" id="connectBtn">
+                <span id="connectBtnLabel" data-i18n="dashboard.connectBtn"
+                  >اتصال</span
+                >
+              </button>
+            </div>
+
+            <div class="card tunnel-visual">
+              <div class="tunnel-stage" id="tunnelStage">
+                <div class="node node-device">
+                  <span class="node-ico">💻</span>
+                  <small data-i18n="dashboard.device">جهازك</small>
+                </div>
+                <div class="pulse-line" id="pulseLine">
+                  <div class="pulse-dot"></div>
+                </div>
+                <div class="node node-server">
+                  <span class="node-ico">🛰</span>
+                  <small id="serverLabel" data-i18n="dashboard.server"
+                    >السيرفر</small
+                  >
+                </div>
+              </div>
+              <div
+                class="tunnel-status"
+                id="tunnelStatusText"
+                data-i18n="dashboard.waiting"
+              >
+                مستني تبدأ الاتصال
+              </div>
+            </div>
+
+            <div class="card stats-card">
+              <div class="stat">
+                <span class="stat-label" data-i18n="dashboard.uptime"
+                  >مدة الاتصال</span
+                >
+                <span class="stat-value mono" id="statUptime">00:00:00</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label" data-i18n="dashboard.download"
+                  >تحميل</span
+                >
+                <span class="stat-value mono" id="statDown">0 KB</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label" data-i18n="dashboard.upload">رفع</span>
+                <span class="stat-value mono" id="statUp">0 KB</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label" data-i18n="dashboard.ping"
+                  >البينج</span
+                >
+                <span class="stat-value mono" id="statPing">—</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PROFILES -->
+        <section class="page" id="page-profiles">
+          <header class="page-head">
+            <h1 data-i18n="profiles.title">البروفايلات</h1>
+            <p class="muted" data-i18n="profiles.subtitle">
+              ضيف حساب SSH يدويًا أو بالصيغة السريعة
+            </p>
+          </header>
+
+          <div class="profiles-grid">
+            <div class="card">
+              <h3 data-i18n="profiles.quickAddTitle">إضافة سريعة</h3>
+              <p class="muted small" data-i18n-html="profiles.quickAddDesc">
+                صيغة: <code class="mono">IP:PORT@Username:Password</code> — البورت
+                اختياري (افتراضي 443). تقدر تضيف SNI بـ
+                <code class="mono">#sni.host</code>
+              </p>
+              <textarea
+                id="quickAddInput"
+                class="textarea"
+                data-i18n-placeholder="profiles.quickAddPlaceholder"
+                placeholder="IP:PORT@Username:Password"
+              ></textarea>
+              <div class="row gap">
+                <button
+                  class="btn btn-secondary"
+                  id="quickAddParseBtn"
+                  data-i18n="profiles.parseBtn"
+                >
+                  تحليل ومعاينة
+                </button>
+                <button
+                  class="btn btn-primary"
+                  id="quickAddSaveBtn"
+                  data-i18n="profiles.saveQuickBtn"
+                  disabled
+                >
+                  حفظ كبروفايل
+                </button>
+              </div>
+              <div class="quick-preview" id="quickPreview"></div>
+            </div>
+
+            <div class="card">
+              <h3 data-i18n="profiles.manualTitle">إضافة يدوية</h3>
+              <div class="form-grid">
+                <div class="field">
+                  <label data-i18n="profiles.nameLabel">اسم البروفايل</label>
+                  <input
+                    type="text"
+                    id="f_name"
+                    class="input"
+                    data-i18n-placeholder="profiles.namePlaceholder"
+                    placeholder="مثلاً: سيرفر شغل"
+                  />
+                </div>
+                <div class="field">
+                  <label data-i18n="profiles.hostLabel">الهوست</label>
+                  <input
+                    type="text"
+                    id="f_host"
+                    class="input"
+                    placeholder="2.24.192.219"
+                  />
+                </div>
+                <div class="field">
+                  <label data-i18n="profiles.portLabel">البورت</label>
+                  <select id="f_port" class="select">
+                    <option value="443">443 (HTTPS)</option>
+                    <option value="80">80 (HTTP)</option>
+                    <option value="22" data-i18n="profiles.port22">
+                      22 (SSH افتراضي)
+                    </option>
+                    <option value="custom" data-i18n="profiles.portCustom">
+                      مخصص...
+                    </option>
+                  </select>
+                  <input
+                    type="number"
+                    id="f_port_custom"
+                    class="input"
+                    data-i18n-placeholder="profiles.portCustomPlaceholder"
+                    placeholder="رقم البورت"
+                    style="display: none; margin-top: 6px"
+                  />
+                </div>
+                <div class="field">
+                  <label data-i18n="profiles.userLabel">اليوزرنيم</label>
+                  <input
+                    type="text"
+                    id="f_user"
+                    class="input"
+                    placeholder="username"
+                  />
+                </div>
+                <div class="field">
+                  <label data-i18n="profiles.passLabel">الباسورد</label>
+                  <input
+                    type="password"
+                    id="f_pass"
+                    class="input"
+                    placeholder="password"
+                  />
+                </div>
+                <div class="field">
+                  <label data-i18n="profiles.sniLabel">SNI (اختياري)</label>
+                  <input
+                    type="text"
+                    id="f_sni"
+                    class="input"
+                    data-i18n-placeholder="profiles.sniPlaceholder"
+                    placeholder="مثلاً: cdn.example.com"
+                  />
+                </div>
+                <div class="field">
+                  <label data-i18n="profiles.colorLabel">لون التمييز</label>
+                  <input
+                    type="color"
+                    id="f_color"
+                    class="input color"
+                    value="#2DD4BF"
+                  />
+                </div>
+              </div>
+              <div class="row gap">
+                <button
+                  class="btn btn-ghost"
+                  id="testConnBtn"
+                  data-i18n="profiles.testBtn"
+                >
+                  اختبار الاتصال
+                </button>
+                <button
+                  class="btn btn-primary"
+                  id="saveProfileBtn"
+                  data-i18n="profiles.saveBtn"
+                >
+                  حفظ البروفايل
+                </button>
+              </div>
+              <div id="testConnResult" class="muted small"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="row space-between">
+              <h3 data-i18n="profiles.allTitle">كل البروفايلات</h3>
+              <div class="row gap">
+                <input
+                  type="text"
+                  id="profileSearch"
+                  class="input"
+                  data-i18n-placeholder="profiles.searchPlaceholder"
+                  placeholder="بحث..."
+                />
+                <button
+                  class="btn btn-ghost"
+                  id="exportBtn"
+                  data-i18n="profiles.exportBtn"
+                >
+                  تصدير
+                </button>
+                <button
+                  class="btn btn-ghost"
+                  id="importBtn"
+                  data-i18n="profiles.importBtn"
+                >
+                  استيراد
+                </button>
+              </div>
+            </div>
+            <table class="profiles-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th data-i18n="profiles.thName">الاسم</th>
+                  <th data-i18n="profiles.thHost">الهوست</th>
+                  <th data-i18n="profiles.thPort">البورت</th>
+                  <th data-i18n="profiles.thSni">SNI</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="profilesTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- LOGS -->
+        <section class="page" id="page-logs">
+          <header class="page-head">
+            <h1 data-i18n="logs.title">السجل</h1>
+            <p class="muted" data-i18n="logs.subtitle">
+              تفاصيل تقنية لكل خطوة في الاتصال
+            </p>
+          </header>
+          <div class="card">
+            <div class="row space-between">
+              <span class="muted small">SSH → SOCKS5 → TUN/VPN</span>
+              <div class="row gap">
+                <button
+                  class="btn btn-ghost"
+                  id="clearLogsBtn"
+                  data-i18n="logs.clearBtn"
+                >
+                  مسح
+                </button>
+                <button
+                  class="btn btn-ghost"
+                  id="copyLogsBtn"
+                  data-i18n="logs.copyBtn"
+                >
+                  نسخ الكل
+                </button>
+              </div>
+            </div>
+            <pre class="console" id="consoleBox"></pre>
+          </div>
+        </section>
+
+        <!-- SETTINGS -->
+        <section class="page" id="page-settings">
+          <header class="page-head">
+            <h1 data-i18n="settings.title">الإعدادات</h1>
+          </header>
+
+          <div class="card settings-list">
+            <div class="setting-row">
+              <div>
+                <strong data-i18n="settings.langTitle">لغة الواجهة</strong>
+                <p class="muted small" data-i18n="settings.langDesc">
+                  اختار اللغة اللي تفضل تستخدم بيها البرنامج
+                </p>
+              </div>
+              <div
+                class="lang-switch"
+                id="langSwitchSettings"
+                role="group"
+                aria-label="Language"
+              >
+                <button class="lang-btn" data-lang="ar">AR</button>
+                <button class="lang-btn" data-lang="en">EN</button>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div>
+                <strong data-i18n="settings.sniTitle"
+                  >SNI افتراضي لكل البروفايلات</strong
+                >
+                <p class="muted small" data-i18n="settings.sniDesc">
+                  لو بروفايل معينله SNI خاص بيتجاهل ده، أما لو فاضي بيستخدم
+                  القيمة دي تلقائيًا لكل الاتصالات
+                </p>
+              </div>
+              <input
+                type="text"
+                id="s_defaultsni"
+                class="input narrow"
+                data-i18n-placeholder="settings.sniPlaceholder"
+                placeholder="مثلاً: ea.com"
+                style="width: 220px"
+              />
+            </div>
+
+            <div class="setting-row">
+              <div>
+                <strong data-i18n="settings.killTitle">Kill Switch</strong>
+                <p class="muted small" data-i18n="settings.killDesc">
+                  يقفل الإنترنت تمامًا لو النفق وقع، بدل ما يسرّب ترافيك بره الـ
+                  VPN
+                </p>
+              </div>
+              <label class="switch"
+                ><input type="checkbox" id="s_killswitch" /><span></span
+              ></label>
+            </div>
+
+            <div class="setting-row">
+              <div>
+                <strong data-i18n="settings.reconnectTitle"
+                  >إعادة الاتصال التلقائي</strong
+                >
+                <p class="muted small" data-i18n="settings.reconnectDesc">
+                  يحاول يرجع يتصل لوحده لو النفق اتقطع
+                </p>
+              </div>
+              <label class="switch"
+                ><input type="checkbox" id="s_reconnect" /><span></span
+              ></label>
+            </div>
+
+            <div class="setting-row">
+              <div>
+                <strong data-i18n="settings.autoconnectTitle"
+                  >الاتصال التلقائي عند فتح البرنامج</strong
+                >
+                <p class="muted small" data-i18n="settings.autoconnectDesc">
+                  يتصل بآخر بروفايل استخدمته أوتوماتيك
+                </p>
+              </div>
+              <label class="switch"
+                ><input type="checkbox" id="s_autoconnect" /><span></span
+              ></label>
+            </div>
+
+            <div class="setting-row">
+              <div>
+                <strong data-i18n="settings.autostartTitle"
+                  >تشغيل مع ويندوز</strong
+                >
+                <p class="muted small" data-i18n="settings.autostartDesc">
+                  يفتح Waslah تلقائيًا عند تشغيل الجهاز
+                </p>
+              </div>
+              <label class="switch"
+                ><input type="checkbox" id="s_autostart" /><span></span
+              ></label>
+            </div>
+
+            <div class="setting-row">
+              <div>
+                <strong data-i18n="settings.retriesTitle"
+                  >عدد محاولات إعادة الاتصال</strong
+                >
+              </div>
+              <input
+                type="number"
+                id="s_maxretries"
+                class="input narrow"
+                min="1"
+                max="20"
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- ABOUT / DEVELOPER -->
+        <section class="page" id="page-about">
+          <header class="page-head">
+            <h1 data-i18n="about.title">عن المطوّر</h1>
+          </header>
+
+          <div class="card about-card">
+            <div class="about-header">
+              <div class="avatar-mark">AA</div>
+              <div>
+                <h2>Abdelrahman Ayman</h2>
+                <p class="muted" data-i18n="about.role">
+                  Frontend Developer — React / Next.js
+                </p>
+              </div>
+            </div>
+
+            <p class="about-text" data-i18n-html="about.body">
+              تطبيق <strong>Waslah</strong> اتبنى كأداة شخصية لإدارة وتشغيل
+              أنفاق SSH مع دعم SNI bypass، مبني بالكامل بـ Electron + Node.js،
+              وبيستخدم <code class="mono">ssh2</code> للاتصال،
+              <code class="mono">socksv5</code> للبروكسي المحلي، و<code
+                class="mono"
+                >tun2socks</code
+              >
+              + Wintun لتحويله لـ VPN حقيقي على مستوى النظام.
+            </p>
+
+            <div class="links-grid">
+              <button
+                class="btn btn-ghost link-btn"
+                data-link="https://github.com/Abdelrahman968"
+              >
+                GitHub
+              </button>
+              <button
+                class="btn btn-ghost link-btn"
+                data-link="https://abdelrahman-portfolio-rho.vercel.app"
+              >
+                Portfolio
+              </button>
+              <button
+                class="btn btn-ghost link-btn"
+                data-link="https://linkedin.com/in/abdelrahman968"
+              >
+                LinkedIn
+              </button>
+            </div>
+
+            <div class="version-row muted small">
+              <span data-i18n="about.version">الإصدار</span>
+              <span id="appVersion">1.0.0</span> —
+              <span data-i18n="about.madeIn"
+                >Made By Abdelrahman, Egypt 🇪🇬</span
+              >
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="js/app.js"></script>
+  </body>
+</html>

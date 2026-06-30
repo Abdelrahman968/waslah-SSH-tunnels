@@ -1,0 +1,53 @@
+{
+  "name": "waslah",
+  "productName": "Waslah",
+  "version": "1.0.0",
+  "description": "SSH-based VPN tunnel client with SNI bypass support - Windows",
+  "main": "main/main.js",
+  "author": "Abdelrahman Ayman <https://abdelrahman-portfolio-rho.vercel.app>",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder --win",
+    "pack": "electron-builder --dir"
+  },
+  "dependencies": {
+    "ssh2": "^1.15.0",
+    "socksv5": "^0.0.6",
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.abdelrahman968.waslah",
+    "productName": "Waslah",
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": true
+    }
+  }
+}
