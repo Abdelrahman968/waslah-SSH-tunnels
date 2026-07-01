@@ -12,7 +12,6 @@
 ![Electron](https://img.shields.io/badge/Electron-Latest-47848F?style=for-the-badge&logo=electron)
 ![Node.js](https://img.shields.io/badge/Node.js-20+-339933?style=for-the-badge&logo=node.js)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
-![Language](https://img.shields.io/badge/Languages-English%20%7C%20العربية-success?style=for-the-badge)
 
 _A lightweight yet powerful SSH manager designed to simplify secure tunneling while delivering a modern desktop experience._
 
