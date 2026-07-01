@@ -84,9 +84,11 @@ class VpnManager extends EventEmitter {
     this.proc.stdout.on('data', (d) => this.emit('log', `[tun2socks] ${d.toString().trim()}`));
     this.proc.stderr.on('data', (d) => this.emit('log', `[tun2socks] ${d.toString().trim()}`));
     this.proc.on('exit', (code) => {
+      const wasActive = this.active;
       this.active = false;
       this.emit('log', `[tun2socks] خرج بالكود ${code}`);
-      if (code !== 0) this.emit('killswitch-trigger');
+      if (code !== 0 && wasActive) this.emit('killswitch-trigger');
+      else if (code !== 0) this.emit('vpn-start-failed', code);
     });
 
     // Give the adapter a moment to come up before re-routing default traffic.

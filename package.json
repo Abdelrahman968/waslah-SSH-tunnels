@@ -4,18 +4,27 @@
   "version": "1.0.0",
   "description": "SSH-based VPN tunnel client with SNI bypass support - Windows",
   "main": "main/main.js",
-  "author": "Abdelrahman Ayman <https://abdelrahman-portfolio-rho.vercel.app>",
+  "author": {
+    "name": "Abdelrahman Ayman",
+    "url": "https://abdelrahman-portfolio-rho.vercel.app"
+  },
+  "homepage": "https://abdelrahman-portfolio-rho.vercel.app",
   "license": "MIT",
+  "private": true,
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "pack": "electron-builder --dir",
     "build": "electron-builder --win",
-    "pack": "electron-builder --dir"
+    "build:x64": "electron-builder --win --x64",
+    "dist": "electron-builder"
   },
   "dependencies": {
-    "ssh2": "^1.15.0",
+    "electron-store": "^8.2.0",
+    "jimp": "^0.22.12",
+    "qrcode-reader": "^1.0.4",
     "socksv5": "^0.0.6",
-    "electron-store": "^8.2.0"
+    "ssh2": "^1.15.0"
   },
   "devDependencies": {
     "electron": "^30.0.0",
@@ -24,11 +33,25 @@
   "build": {
     "appId": "com.abdelrahman968.waslah",
     "productName": "Waslah",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "asar": true,
+    "compression": "maximum",
+    "copyright": "© 2026 Abdelrahman Ayman",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
     "files": [
       "main/**/*",
       "renderer/**/*",
       "assets/**/*",
-      "package.json"
+      "package.json",
+      "!**/*.map",
+      "!**/*.log",
+      "!**/.git/**",
+      "!**/.github/**",
+      "!node_modules/**/{test,__tests__,tests,example,examples}",
+      "!node_modules/**/{README.md,README,readme.md,CHANGELOG.md}"
     ],
     "extraResources": [
       {
@@ -40,14 +63,33 @@
       }
     ],
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.ico",
-      "requestedExecutionLevel": "requireAdministrator"
+      "requestedExecutionLevel": "requireAdministrator",
+      "publisherName": "Abdelrahman Ayman",
+      "legalTrademarks": "Waslah",
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
-      "perMachine": true
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Waslah",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
     }
   }
 }

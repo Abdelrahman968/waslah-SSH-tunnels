@@ -1,82 +1,459 @@
+# Waslah
+
+<div align="center">
+
+<img src="assets/icon.png" width="128" alt="Waslah Logo">
+
 # Waslah (وصلة)
 
-A desktop app built with Electron for managing and running SSH tunnels with
-SNI bypass support, turning them into a real system-wide VPN on Windows via
-a TUN adapter.
+**A modern Electron-powered SSH tunneling client with SNI support, system-wide VPN capabilities, advanced networking tools, and a clean multilingual interface.**
 
-## Features
+![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge)
+![Electron](https://img.shields.io/badge/Electron-Latest-47848F?style=for-the-badge&logo=electron)
+![Node.js](https://img.shields.io/badge/Node.js-20+-339933?style=for-the-badge&logo=node.js)
+![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
+![Language](https://img.shields.io/badge/Languages-English%20%7C%20العربية-success?style=for-the-badge)
 
-- **Multiple profiles**: save more than one SSH account and switch between
-  them easily.
-- **One-line quick add**: `host:port@user:pass` (port is optional, defaults
-  to 443), with support for `#sni.host` to add an SNI on the same line.
-- **SNI / TLS bypass**: routes the connection through a TLS handshake with a
-  custom SNI before it reaches SSH, for networks that filter at the
-  DNS/SNI level.
-- **Real system-wide VPN**: not just a proxy — all of the device's traffic
-  goes through the tunnel via `tun2socks` + Wintun.
-- **Kill Switch**: if the tunnel drops unexpectedly, the internet is cut off
-  completely instead of leaking traffic outside the VPN.
-- **Auto-reconnect** with a configurable number of attempts and interval.
-- **Password encryption** locally via `safeStorage` (DPAPI on Windows).
-- **Import/export profiles** as a JSON file.
-- **Connection test** (ping) before saving or connecting to any profile.
-- **Live stats**: connection duration, download/upload, tunnel status with
-  an interactive visual.
-- **System Tray**: close the window without closing the connection, with
-  quick controls from the tray.
-- **Full technical logs** for every stage: SSH → SOCKS5 → TUN/VPN.
-- **"About the Developer" page** with GitHub and portfolio links.
+_A lightweight yet powerful SSH manager designed to simplify secure tunneling while delivering a modern desktop experience._
 
-## Running (Development)
+</div>
+
+---
+
+# ✨ Overview
+
+Waslah is a desktop application built with **Electron** that allows you to create and manage encrypted SSH tunnels with optional **TLS/SNI encapsulation**.
+
+Unlike traditional SSH clients, Waslah combines SSH profile management, networking utilities, VPN routing, multilingual support, encrypted local storage, and a modern UI into a single application.
+
+The application can operate as:
+
+- Secure SSH Tunnel
+- SOCKS5 Proxy
+- System-wide VPN (via tun2socks + Wintun)
+- Network Diagnostic Toolkit
+- SSH Profile Manager
+
+---
+
+# 🚀 Features
+
+## 🔐 SSH Management
+
+- Unlimited SSH profiles
+- One-click connect/disconnect
+- Quick profile import
+
+```
+host:port@username:password#sni
+```
+
+- Password visibility toggle
+- Duplicate profile detection
+- Favorites
+- Search & filtering
+- Import / Export profiles
+- Automatic reconnect
+- Connection timeout handling
+- Connection duration tracking
+
+---
+
+## 🌐 SNI Manager
+
+Organize and reuse SNI hosts across multiple profiles.
+
+Features include:
+
+- Global default SNI
+- Favorite SNIs
+- Search
+- Edit/Delete
+- One-click assignment
+- Automatic validation
+
+---
+
+## 🛡 True System-Wide VPN
+
+Powered by:
+
+- Wintun
+- tun2socks
+
+Capabilities:
+
+- Full system routing
+- Kill Switch
+- Automatic routing restoration
+- DNS forwarding
+- Auto reconnect
+- Automatic cleanup
+- Live traffic statistics
+
+---
+
+## ⚡ SOCKS5 Proxy
+
+Every SSH connection can expose a local SOCKS5 proxy.
+
+Supports:
+
+- Custom local ports
+- Browser proxy
+- Game launcher proxy
+- Command-line applications
+- IDEs
+- Git
+- npm
+- curl
+- PowerShell
+
+---
+
+## 📡 VLESS / V2Ray Configuration Manager
+
+Manage VLESS configurations without external tools.
+
+Supported:
+
+- Import from vless://
+- Import JSON
+- QR Code scanning
+- Configuration validation
+- Export
+- Edit
+- Delete
+
+> **Note**
+>
+> This module currently manages configurations only.
+> Native VLESS/V2Ray connections are planned for future releases.
+
+---
+
+## 🧰 Network Toolkit
+
+Built-in networking utilities include:
+
+- What's My IP
+- DNS Lookup
+- TCP Ping
+- HTTP Ping
+- Port Scanner
+- SSL Certificate Checker
+- Traceroute
+- Whois Lookup
+- Base64 Encode / Decode
+- URL Encode / Decode
+
+Everything is available directly inside the application.
+
+---
+
+## 📊 Live Dashboard
+
+Real-time statistics including:
+
+- Connection state
+- Upload speed
+- Download speed
+- Session duration
+- Active profile
+- Last events
+- Current IP
+- VPN status
+
+---
+
+## 📄 Logging System
+
+Powerful logging designed for troubleshooting.
+
+Supports:
+
+- Categories
+- Severity levels
+- Search
+- Filtering
+- Export
+- Clear logs
+- Enable/Disable
+- Recent dashboard events
+
+---
+
+## 🌍 Localization
+
+Fully multilingual.
+
+Languages:
+
+- 🇺🇸 English
+- 🇪🇬 العربية (RTL)
+
+Switch languages instantly without restarting the application.
+
+---
+
+## 🎨 Modern UI
+
+Designed with productivity in mind.
+
+Features:
+
+- Dark Mode
+- Light Mode
+- Responsive layout
+- Smooth animations
+- Keyboard shortcuts
+- Dashboard widgets
+- Modern cards
+- Status indicators
+
+---
+
+## 🔒 Security
+
+Security is one of Waslah's core priorities.
+
+### Password Encryption
+
+Passwords are encrypted locally using:
+
+```
+Electron safeStorage
+```
+
+Sensitive information is never stored as plain text.
+
+### Local Storage
+
+- No cloud synchronization
+- No telemetry
+- No tracking
+- No external credential storage
+
+Everything remains on the user's computer.
+
+---
+
+# 📦 Installation
+
+Clone the repository
+
+```bash
+git clone https://github.com/yourusername/waslah.git
+```
+
+Install dependencies
 
 ```bash
 npm install
+```
+
+Run
+
+```bash
 npm start
 ```
 
-> On Windows, run the terminal/IDE with Administrator privileges so the VPN
-> part (TUN adapter + routing changes) works correctly.
+---
 
-## Files you need to set up manually
+# ⚠ Administrator Privileges
 
-See `bin/README.md` — you'll need `tun2socks.exe` and `wintun.dll` for the
-full system-wide VPN feature. Without them, the app still works as a
-regular SSH + SOCKS5 proxy.
+Waslah automatically requests Administrator permissions (Windows UAC) when launched.
 
-## Building an installer (.exe)
+Administrator rights are required for:
+
+- Wintun
+- Route management
+- VPN mode
+- DNS routing
+- Kill Switch
+
+SSH-only mode works normally without VPN functionality.
+
+---
+
+# 📁 Required External Files
+
+The following binaries must be placed inside:
+
+```
+bin/
+```
+
+Required files:
+
+```
+tun2socks.exe
+wintun.dll
+```
+
+Without these binaries:
+
+✅ SSH Tunnel works
+
+✅ SOCKS5 works
+
+❌ System-wide VPN unavailable
+
+---
+
+# 🏗 Build
+
+Create a Windows installer:
 
 ```bash
 npm run build
 ```
 
-The output will be in `dist/`.
-
-## Structure
+Output:
 
 ```
-main/
-  main.js              Electron main process + IPC + Tray
-  preload.js           Secure bridge between main and renderer
-  store/profileStore.js Profile storage + password encryption
-  utils/parser.js       Quick-add format parser
-  ssh/sshTunnel.js       SSH connection + SNI/TLS support
-  ssh/socksProxy.js      Local SOCKS5 proxy over the tunnel
-  ssh/vpnManager.js      TUN adapter + routing + kill switch
-  ssh/connectionManager.js Coordinates everything + auto-reconnect
-renderer/
-  index.html / css / js  UI (Dashboard, Profiles, Logs, Settings, About)
-bin/                      Where tun2socks.exe and wintun.dll go (not included)
+dist/
 ```
-
-## Disclaimer
-
-This tool is technically just regular SSH tunneling (the same idea as
-`ssh -D`) wrapped in a GUI, and contains no hacking or security bypass of
-any kind. Using it to get around a particular network's filtering may
-violate your service provider's terms of use — that responsibility is on
-the user.
 
 ---
 
-Built by **Abdelrahman Ayman** Egypt 🇪🇬
+# 📂 Project Structure
+
+```
+Waslah/
+
+├── main/
+│   ├── main.js
+│   ├── preload.js
+│   ├── store/
+│   │   └── profileStore.js
+│   ├── ssh/
+│   │   ├── sshTunnel.js
+│   │   ├── socksProxy.js
+│   │   ├── vpnManager.js
+│   │   └── connectionManager.js
+│   └── utils/
+│       └── parser.js
+│
+├── renderer/
+│   ├── index.html
+│   ├── css/
+│   └── js/
+│
+├── assets/
+│
+├── bin/
+│
+├── package.json
+│
+└── README.md
+```
+
+---
+
+# 🛠 Technology Stack
+
+| Technology | Purpose           |
+| ---------- | ----------------- |
+| Electron   | Desktop Framework |
+| Node.js    | Backend Runtime   |
+| SSH2       | SSH Client        |
+| Wintun     | TUN Adapter       |
+| tun2socks  | VPN Routing       |
+| HTML5      | UI                |
+| CSS3       | Styling           |
+| JavaScript | Application Logic |
+
+---
+
+# 🗺 Roadmap
+
+## Upcoming Features
+
+- Native VLESS Engine
+- VMess Support
+- Trojan Support
+- WireGuard Support
+- OpenVPN Support
+- Plugin System
+- Bandwidth Graphs
+- Split Tunneling
+- Auto Update
+- Connection Scheduler
+- SSH Key Authentication
+- Multi-Hop SSH
+- Plugin Marketplace
+- Profile Synchronization
+- Portable Mode
+- Linux Support
+- macOS Support
+
+---
+
+# 🤝 Contributing
+
+Contributions are welcome.
+
+You can help by:
+
+- Reporting bugs
+- Suggesting new features
+- Improving documentation
+- Creating pull requests
+- Translating the application
+
+---
+
+# 📜 Disclaimer
+
+Waslah is a graphical frontend for standard SSH tunneling technologies.
+
+It does **not** exploit security vulnerabilities, bypass authentication mechanisms, or perform unauthorized access.
+
+The software is intended for:
+
+- Secure remote access
+- Privacy
+- Development
+- Network diagnostics
+- Educational purposes
+
+Users are solely responsible for complying with the laws, regulations, and terms of service applicable in their jurisdiction.
+
+---
+
+# 📄 License
+
+Licensed under the **MIT License**.
+
+See the **LICENSE** file for details.
+
+---
+
+# ❤️ Credits
+
+Built with ❤️ using:
+
+- Electron
+- Node.js
+- SSH2
+- Wintun
+- tun2socks
+
+---
+
+<div align="center">
+
+## Waslah
+
+**Fast • Secure • Modern**
+
+Designed & Developed by
+
+# Abdelrahman Ayman
+
+**MERN Stack Developer**
+
+🇪🇬 Dakahlia, Egypt
+
+</div>

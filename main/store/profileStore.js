@@ -66,6 +66,7 @@ function defaultSettings() {
   return {
     theme: 'dark',
     language: 'ar',
+    loggingEnabled: true,
     autoStartWindows: false,
     autoConnectLastProfile: false,
     killSwitch: true,
@@ -152,6 +153,65 @@ function importProfiles(list) {
   return listProfiles();
 }
 
+// ---------------- SNI list ----------------
+function listSni() {
+  const state = readAll();
+  return state.sniList || [];
+}
+
+function upsertSni(entry) {
+  const state = readAll();
+  state.sniList = state.sniList || [];
+  const id = entry.id || crypto.randomUUID();
+  const record = {
+    id,
+    host: entry.host,
+    favorite: !!entry.favorite,
+    createdAt: entry.createdAt || Date.now(),
+  };
+  const idx = state.sniList.findIndex((x) => x.id === id);
+  if (idx >= 0) state.sniList[idx] = record;
+  else state.sniList.push(record);
+  writeAll(state);
+  return record;
+}
+
+function deleteSni(id) {
+  const state = readAll();
+  state.sniList = (state.sniList || []).filter((x) => x.id !== id);
+  writeAll(state);
+}
+
+// ---------------- VLESS / V2Ray profiles ----------------
+function listVlessProfiles() {
+  const state = readAll();
+  return state.vlessProfiles || [];
+}
+
+function upsertVlessProfile(profile) {
+  const state = readAll();
+  state.vlessProfiles = state.vlessProfiles || [];
+  const id = profile.id || crypto.randomUUID();
+  const record = {
+    id,
+    name: profile.name || 'VLESS profile',
+    raw: profile.raw, // original vless:// URI or JSON string, kept verbatim
+    parsed: profile.parsed || null,
+    createdAt: profile.createdAt || Date.now(),
+  };
+  const idx = state.vlessProfiles.findIndex((x) => x.id === id);
+  if (idx >= 0) state.vlessProfiles[idx] = record;
+  else state.vlessProfiles.push(record);
+  writeAll(state);
+  return record;
+}
+
+function deleteVlessProfile(id) {
+  const state = readAll();
+  state.vlessProfiles = (state.vlessProfiles || []).filter((x) => x.id !== id);
+  writeAll(state);
+}
+
 module.exports = {
   listProfiles,
   getProfileWithSecret,
@@ -161,4 +221,10 @@ module.exports = {
   updateSettings,
   exportProfiles,
   importProfiles,
+  listSni,
+  upsertSni,
+  deleteSni,
+  listVlessProfiles,
+  upsertVlessProfile,
+  deleteVlessProfile,
 };

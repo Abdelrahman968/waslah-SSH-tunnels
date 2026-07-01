@@ -1,349 +1,88 @@
-"use strict";
+'use strict';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 let profilesCache = [];
+let sniCache = [];
+let vlessCache = [];
 let selectedProfileId = null;
 let uptimeTimer = null;
-let lastStatusPayload = null;
+let currentSettings = null;
+let recentLogEntries = [];
 
-// ==========================================================
-// i18n
-// ==========================================================
-const translations = {
-  ar: {
-    brand: { tagline: "وصلة SSH" },
-    nav: {
-      dashboard: "الاتصال",
-      profiles: "البروفايلات",
-      logs: "السجل",
-      settings: "الإعدادات",
-      about: "عن المطوّر",
-    },
-    status: {
-      disconnected: "مش متصل",
-      connecting: "بيتصل...",
-      connected: "متصل ✅",
-      reconnecting: "بيحاول يرجع يتصل...",
-      disconnecting: "بيقطع الاتصال...",
-      error: "حصل خطأ",
-    },
-    dashboard: {
-      title: "الاتصال",
-      subtitle: "اختار بروفايل وابدأ النفق",
-      profileLabel: "البروفايل",
-      noProfiles: "مفيش بروفايلات لسه — ضيف واحد من تبويب البروفايلات",
-      connectBtn: "اتصال",
-      disconnectBtn: "قطع الاتصال",
-      cancelBtn: "إلغاء المحاولة",
-      working: "...",
-      device: "جهازك",
-      server: "السيرفر",
-      waiting: "مستني تبدأ الاتصال",
-      uptime: "مدة الاتصال",
-      download: "تحميل",
-      upload: "رفع",
-      ping: "البينج",
-      metaHost: "الهوست",
-      metaUser: "اليوزر",
-      metaSni: "SNI",
-    },
-    profiles: {
-      title: "البروفايلات",
-      subtitle: "ضيف حساب SSH يدويًا أو بالصيغة السريعة",
-      quickAddTitle: "إضافة سريعة",
-      quickAddDesc:
-        'صيغة: <code class="mono">host:port@user:pass</code> — البورت اختياري (افتراضي 443). تقدر تضيف SNI بـ <code class="mono">#sni.host</code>',
-      quickAddPlaceholder: "IP:PORT@Username:Password",
-      parseBtn: "تحليل ومعاينة",
-      saveQuickBtn: "حفظ كبروفايل",
-      manualTitle: "إضافة يدوية",
-      nameLabel: "اسم البروفايل",
-      namePlaceholder: "مثلاً: سيرفر شغل",
-      hostLabel: "الهوست",
-      portLabel: "البورت",
-      port22: "22 (SSH افتراضي)",
-      portCustom: "مخصص...",
-      portCustomPlaceholder: "رقم البورت",
-      userLabel: "اليوزرنيم",
-      passLabel: "الباسورد",
-      sniLabel: "SNI (اختياري)",
-      sniPlaceholder: "مثلاً: cdn.example.com",
-      colorLabel: "لون التمييز",
-      testBtn: "اختبار الاتصال",
-      saveBtn: "حفظ البروفايل",
-      testing: "بنختبر...",
-      allTitle: "كل البروفايلات",
-      searchPlaceholder: "بحث...",
-      exportBtn: "تصدير",
-      importBtn: "استيراد",
-      thName: "الاسم",
-      thHost: "الهوست",
-      thPort: "البورت",
-      thSni: "SNI",
-      copyTitle: "نسخ الصيغة السريعة",
-      deleteTitle: "حذف",
-      noResultsRow: "مفيش نتائج مطابقة",
-    },
-    logs: {
-      title: "السجل",
-      subtitle: "تفاصيل تقنية لكل خطوة في الاتصال",
-      clearBtn: "مسح",
-      copyBtn: "نسخ الكل",
-    },
-    settings: {
-      title: "الإعدادات",
-      langTitle: "لغة الواجهة",
-      langDesc: "اختار اللغة اللي تفضل تستخدم بيها البرنامج",
-      sniTitle: "SNI افتراضي لكل البروفايلات",
-      sniDesc:
-        "لو بروفايل معينله SNI خاص بيتجاهل ده، أما لو فاضي بيستخدم القيمة دي تلقائيًا لكل الاتصالات",
-      sniPlaceholder: "مثلاً: ea.com",
-      killTitle: "Kill Switch",
-      killDesc:
-        "يقفل الإنترنت تمامًا لو النفق وقع، بدل ما يسرّب ترافيك بره الـ VPN",
-      reconnectTitle: "إعادة الاتصال التلقائي",
-      reconnectDesc: "يحاول يرجع يتصل لوحده لو النفق اتقطع",
-      autoconnectTitle: "الاتصال التلقائي عند فتح البرنامج",
-      autoconnectDesc: "يتصل بآخر بروفايل استخدمته أوتوماتيك",
-      autostartTitle: "تشغيل مع ويندوز",
-      autostartDesc: "يفتح Waslah تلقائيًا عند تشغيل الجهاز",
-      retriesTitle: "عدد محاولات إعادة الاتصال",
-    },
-    about: {
-      title: "عن المطوّر",
-      role: "Frontend Developer — React / Next.js",
-      body: 'تطبيق <strong>Waslah</strong> اتبنى كأداة شخصية لإدارة وتشغيل أنفاق SSH مع دعم SNI bypass، مبني بالكامل بـ Electron + Node.js، وبيستخدم <code class="mono">ssh2</code> للاتصال، <code class="mono">socksv5</code> للبروكسي المحلي، و<code class="mono">tun2socks</code> + Wintun لتحويله لـ VPN حقيقي على مستوى النظام.',
-      version: "الإصدار",
-      madeIn: "Made in Dakahlia, Egypt 🇪🇬",
-    },
-    toast: {
-      profileDeleted: "اتمسح البروفايل",
-      formatCopied: "اتنسخت الصيغة السريعة",
-      profileSaved: "اتحفظ البروفايل",
-      missingFields: "فيه حقول ناقصة",
-      exported: "اتصدّرت البروفايلات (ملف فيه باسوردات — احفظه بأمان)",
-      imported: "اتستوردت البروفايلات",
-      chooseProfileFirst: "اختار بروفايل الأول",
-      connectFailed: "فشل الاتصال: ",
-      sniSaved: "اتحفظ الـ SNI الافتراضي",
-      logsCopied: "اتنسخ السجل كامل",
-      fillHostPort: "املأ الهوست والبورت الأول",
-    },
-    test: { ok: "✓ السيرفر بيرد — ", fail: "✗ السيرفر مش بيرد على البورت ده" },
-    quick: {
-      ok: "✓ هوست: ",
-      portLbl: "— بورت: ",
-      userLbl: "— يوزر: ",
-      sniLbl: "— SNI: ",
-      fail: "✗ الصيغة غلط. لازم تكون: host:port@user:pass",
-    },
-  },
-  en: {
-    brand: { tagline: "SSH Tunnel" },
-    nav: {
-      dashboard: "Connection",
-      profiles: "Profiles",
-      logs: "Logs",
-      settings: "Settings",
-      about: "About",
-    },
-    status: {
-      disconnected: "Disconnected",
-      connecting: "Connecting...",
-      connected: "Connected ✅",
-      reconnecting: "Reconnecting...",
-      disconnecting: "Disconnecting...",
-      error: "Error",
-    },
-    dashboard: {
-      title: "Connection",
-      subtitle: "Pick a profile and start the tunnel",
-      profileLabel: "Profile",
-      noProfiles: "No profiles yet — add one from the Profiles tab",
-      connectBtn: "Connect",
-      disconnectBtn: "Disconnect",
-      cancelBtn: "Cancel attempt",
-      working: "...",
-      device: "Your device",
-      server: "Server",
-      waiting: "Waiting to connect",
-      uptime: "Uptime",
-      download: "Download",
-      upload: "Upload",
-      ping: "Ping",
-      metaHost: "Host",
-      metaUser: "User",
-      metaSni: "SNI",
-    },
-    profiles: {
-      title: "Profiles",
-      subtitle: "Add an SSH account manually or with quick add",
-      quickAddTitle: "Quick add",
-      quickAddDesc:
-        'Format: <code class="mono">host:port@user:pass</code> — port is optional (default 443). Add an SNI with <code class="mono">#sni.host</code>',
-      quickAddPlaceholder: "IP:PORT@Username:Password",
-      parseBtn: "Parse & preview",
-      saveQuickBtn: "Save as profile",
-      manualTitle: "Manual add",
-      nameLabel: "Profile name",
-      namePlaceholder: "e.g. Work server",
-      hostLabel: "Host",
-      portLabel: "Port",
-      port22: "22 (SSH default)",
-      portCustom: "Custom...",
-      portCustomPlaceholder: "Port number",
-      userLabel: "Username",
-      passLabel: "Password",
-      sniLabel: "SNI (optional)",
-      sniPlaceholder: "e.g. cdn.example.com",
-      colorLabel: "Accent color",
-      testBtn: "Test connection",
-      saveBtn: "Save profile",
-      testing: "Testing...",
-      allTitle: "All profiles",
-      searchPlaceholder: "Search...",
-      exportBtn: "Export",
-      importBtn: "Import",
-      thName: "Name",
-      thHost: "Host",
-      thPort: "Port",
-      thSni: "SNI",
-      copyTitle: "Copy quick-add string",
-      deleteTitle: "Delete",
-      noResultsRow: "No matching profiles",
-    },
-    logs: {
-      title: "Logs",
-      subtitle: "Technical detail for every step of the connection",
-      clearBtn: "Clear",
-      copyBtn: "Copy all",
-    },
-    settings: {
-      title: "Settings",
-      langTitle: "Interface language",
-      langDesc: "Choose the language you want the app to use",
-      sniTitle: "Default SNI for all profiles",
-      sniDesc:
-        "If a profile has its own SNI it overrides this. Otherwise this value is used for every connection",
-      sniPlaceholder: "e.g. ea.com",
-      killTitle: "Kill Switch",
-      killDesc:
-        "Cuts the internet completely if the tunnel drops, instead of leaking traffic outside the VPN",
-      reconnectTitle: "Auto-reconnect",
-      reconnectDesc: "Automatically tries to reconnect if the tunnel drops",
-      autoconnectTitle: "Connect on launch",
-      autoconnectDesc: "Automatically connects to your last used profile",
-      autostartTitle: "Start with Windows",
-      autostartDesc: "Opens Waslah automatically when your device starts",
-      retriesTitle: "Reconnect attempts",
-    },
-    about: {
-      title: "About the developer",
-      role: "Frontend Developer — React / Next.js",
-      body: 'Waslah was built as a personal tool for managing and running SSH tunnels with SNI bypass support, built entirely with Electron + Node.js. It uses <code class="mono">ssh2</code> for the connection, <code class="mono">socksv5</code> for the local proxy, and <code class="mono">tun2socks</code> + Wintun to turn it into a real system-wide VPN.',
-      version: "Version",
-      madeIn: "Made in Dakahlia, Egypt 🇪🇬",
-    },
-    toast: {
-      profileDeleted: "Profile deleted",
-      formatCopied: "Quick-add string copied",
-      profileSaved: "Profile saved",
-      missingFields: "Some fields are missing",
-      exported:
-        "Profiles exported (the file contains passwords — keep it safe)",
-      imported: "Profiles imported",
-      chooseProfileFirst: "Choose a profile first",
-      connectFailed: "Connection failed: ",
-      sniSaved: "Default SNI saved",
-      logsCopied: "Full log copied",
-      fillHostPort: "Fill in the host and port first",
-    },
-    test: {
-      ok: "✓ Server responded — ",
-      fail: "✗ Server did not respond on that port",
-    },
-    quick: {
-      ok: "✓ Host: ",
-      portLbl: "— Port: ",
-      userLbl: "— User: ",
-      sniLbl: "— SNI: ",
-      fail: "✗ Wrong format. Must be: host:port@user:pass",
-    },
-  },
-};
-
-let currentLang = localStorage.getItem("waslah_lang") || "ar";
-
-function t(path) {
-  const parts = path.split(".");
-  let node = translations[currentLang];
-  for (const p of parts) {
-    if (node == null) break;
-    node = node[p];
-  }
-  return node != null ? node : path;
-}
-
-function applyTranslations() {
-  $$("[data-i18n]").forEach((el) => {
-    el.textContent = t(el.dataset.i18n);
-  });
-  $$("[data-i18n-html]").forEach((el) => {
-    el.innerHTML = t(el.dataset.i18nHtml);
-  });
-  $$("[data-i18n-placeholder]").forEach((el) => {
-    el.setAttribute("placeholder", t(el.dataset.i18nPlaceholder));
-  });
-  document.title =
-    currentLang === "ar" ? "Waslah — وصلة" : "Waslah — SSH Tunnel";
-}
-
-function updateLangSwitchUI() {
-  $$(".lang-switch .lang-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.lang === currentLang);
-  });
-}
-
-function setLanguage(lang) {
-  if (lang !== "ar" && lang !== "en") return;
-  currentLang = lang;
-  localStorage.setItem("waslah_lang", lang);
-  document.documentElement.lang = lang;
-  document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
-
-  applyTranslations();
-  updateLangSwitchUI();
-  renderProfileSelect();
-  renderProfileTable();
-  if (lastStatusPayload) applyState(lastStatusPayload);
-}
-
-$$(".lang-switch .lang-btn").forEach((btn) => {
-  btn.addEventListener("click", () => setLanguage(btn.dataset.lang));
-});
-
-// ---------------- Navigation ----------------
-$$(".nav-item").forEach((item) => {
-  item.addEventListener("click", () => {
-    $$(".nav-item").forEach((i) => i.classList.remove("active"));
-    $$(".page").forEach((p) => p.classList.remove("active"));
-    item.classList.add("active");
-    $(`#page-${item.dataset.page}`).classList.add("active");
+// ================= Navigation =================
+$$('.nav-item').forEach((item) => {
+  item.addEventListener('click', () => {
+    $$('.nav-item').forEach((i) => i.classList.remove('active'));
+    $$('.page').forEach((p) => p.classList.remove('active'));
+    item.classList.add('active');
+    $(`#page-${item.dataset.page}`).classList.add('active');
+    if (item.dataset.page === 'logs') refreshLogTable();
   });
 });
 
-// ---------------- Toast ----------------
+$('#viewAllLogsBtn').addEventListener('click', () => {
+  $$('.nav-item').forEach((i) => i.classList.remove('active'));
+  $$('.page').forEach((p) => p.classList.remove('active'));
+  $('.nav-item[data-page="logs"]').classList.add('active');
+  $('#page-logs').classList.add('active');
+  refreshLogTable();
+});
+
+// ================= Toast =================
 function toast(msg) {
-  const el = $("#toast");
+  const el = $('#toast');
   el.textContent = msg;
-  el.classList.add("show");
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => el.classList.remove("show"), 2400);
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
 }
 
-// ---------------- Profiles ----------------
+// ================= Theme =================
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  $('#themeLightBtn').classList.toggle('active', theme === 'light');
+  $('#themeDarkBtn').classList.toggle('active', theme === 'dark');
+}
+$('#themeLightBtn').addEventListener('click', async () => {
+  applyTheme('light');
+  await window.waslah.settings.update({ theme: 'light' });
+});
+$('#themeDarkBtn').addEventListener('click', async () => {
+  applyTheme('dark');
+  await window.waslah.settings.update({ theme: 'dark' });
+});
+
+// ================= Language =================
+async function applyLanguage(lang) {
+  await I18N.load(lang);
+  I18N.apply();
+  $('#langArBtn').classList.toggle('active', lang === 'ar');
+  $('#langEnBtn').classList.toggle('active', lang === 'en');
+  renderMiniLogs();
+  renderLogCategoryOptions();
+}
+$('#langArBtn').addEventListener('click', async () => {
+  await applyLanguage('ar');
+  await window.waslah.settings.update({ language: 'ar' });
+});
+$('#langEnBtn').addEventListener('click', async () => {
+  await applyLanguage('en');
+  await window.waslah.settings.update({ language: 'en' });
+});
+
+// ================= Profiles =================
+async function loadSniOptionsInto(selectEl, selectedValue) {
+  selectEl.innerHTML = '<option value="">—</option>';
+  sniCache.forEach((s) => {
+    const opt = document.createElement('option');
+    opt.value = s.host;
+    opt.textContent = s.host + (s.favorite ? ' ★' : '');
+    if (s.host === selectedValue) opt.selected = true;
+    selectEl.appendChild(opt);
+  });
+}
+
 async function loadProfiles() {
   profilesCache = await window.waslah.profiles.list();
   renderProfileSelect();
@@ -351,360 +90,486 @@ async function loadProfiles() {
 }
 
 function renderProfileSelect() {
-  const sel = $("#profileSelect");
-  sel.innerHTML = profilesCache.length
-    ? ""
-    : `<option value="">${t("dashboard.noProfiles")}</option>`;
-
+  const sel = $('#profileSelect');
+  sel.innerHTML = '';
   profilesCache.forEach((p) => {
-    const opt = document.createElement("option");
+    const opt = document.createElement('option');
     opt.value = p.id;
     opt.textContent = `${p.name} — ${p.host}:${p.port}`;
     sel.appendChild(opt);
   });
-
   if (profilesCache.length) {
     selectedProfileId = selectedProfileId || profilesCache[0].id;
     sel.value = selectedProfileId;
     updateProfileMeta();
-  } else {
-    $("#profileMeta").innerHTML = "";
   }
 }
 
-$("#profileSelect").addEventListener("change", (e) => {
+$('#profileSelect').addEventListener('change', (e) => {
   selectedProfileId = e.target.value;
   updateProfileMeta();
 });
 
 function updateProfileMeta() {
   const p = profilesCache.find((x) => x.id === selectedProfileId);
-  const meta = $("#profileMeta");
-  const serverLabel = $("#serverLabel");
-  if (!p) {
-    meta.innerHTML = "";
-    return;
-  }
+  const meta = $('#profileMeta');
+  const serverLabel = $('#serverLabel');
+  if (!p) { meta.innerHTML = ''; return; }
   meta.innerHTML = `
-    <div>${t("dashboard.metaHost")}: <span class="mono">${p.host}:${p.port}</span></div>
-    <div>${t("dashboard.metaUser")}: <span class="mono">${p.username}</span></div>
-    ${p.sni ? `<div>${t("dashboard.metaSni")}: <span class="mono">${p.sni}</span></div>` : ""}
+    <div>${p.host}:${p.port}</div>
+    <div class="mono">${p.username}</div>
+    ${p.sni ? `<div class="mono">SNI: ${p.sni}</div>` : ''}
   `;
   serverLabel.textContent = p.name;
 }
 
 function renderProfileTable() {
-  const body = $("#profilesTableBody");
-  const filter = ($("#profileSearch").value || "").toLowerCase();
+  const body = $('#profilesTableBody');
+  const filter = ($('#profileSearch').value || '').toLowerCase();
   const rows = profilesCache.filter(
-    (p) =>
-      p.name.toLowerCase().includes(filter) ||
-      p.host.toLowerCase().includes(filter),
+    (p) => p.name.toLowerCase().includes(filter) || p.host.toLowerCase().includes(filter)
   );
 
-  if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="6" class="muted small" style="text-align:center;padding:20px;">${t("profiles.noResultsRow")}</td></tr>`;
-    return;
-  }
-
-  body.innerHTML = rows
-    .map(
-      (p) => `
+  body.innerHTML = rows.map((p) => `
     <tr>
       <td><span class="profile-dot" style="background:${p.color}"></span></td>
       <td>${p.name}</td>
       <td class="mono">${p.host}</td>
       <td class="mono">${p.port}</td>
-      <td class="mono">${p.sni || "—"}</td>
+      <td class="mono">${p.sni || '—'}</td>
       <td>
         <div class="table-actions">
-          <button data-action="copy" data-id="${p.id}" title="${t("profiles.copyTitle")}">📋</button>
-          <button data-action="delete" data-id="${p.id}" title="${t("profiles.deleteTitle")}">🗑</button>
+          <button data-action="copy" data-id="${p.id}" data-icon="copy"></button>
+          <button data-action="delete" data-id="${p.id}" data-icon="trash"></button>
         </div>
       </td>
     </tr>
-  `,
-    )
-    .join("");
+  `).join('');
+  applyIcons(body);
 
   body.querySelectorAll('[data-action="delete"]').forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener('click', async () => {
       await window.waslah.profiles.delete(btn.dataset.id);
-      toast(t("toast.profileDeleted"));
+      toast(I18N.t('toast.profileDeleted'));
       await loadProfiles();
     });
   });
-
   body.querySelectorAll('[data-action="copy"]').forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener('click', async () => {
       const str = await window.waslah.profiles.copyQuickAdd(btn.dataset.id);
-      if (str) {
-        navigator.clipboard.writeText(str);
-        toast(t("toast.formatCopied"));
-      }
+      if (str) { navigator.clipboard.writeText(str); toast(I18N.t('toast.copied')); }
     });
   });
 }
+$('#profileSearch').addEventListener('input', renderProfileTable);
 
-$("#profileSearch").addEventListener("input", renderProfileTable);
-
-// ---------------- Quick add ----------------
+// ---- Quick add ----
 let quickAddParsed = null;
-
-$("#quickAddParseBtn").addEventListener("click", async () => {
-  const raw = $("#quickAddInput").value;
+$('#quickAddParseBtn').addEventListener('click', async () => {
+  const raw = $('#quickAddInput').value;
   const result = await window.waslah.profiles.quickAddParse(raw);
-  const preview = $("#quickPreview");
+  const preview = $('#quickPreview');
   if (result.ok) {
     quickAddParsed = result.data;
-    preview.className = "quick-preview ok";
-    preview.innerHTML = `${t("quick.ok")}${result.data.host} ${t("quick.portLbl")}${result.data.port} ${t("quick.userLbl")}${result.data.username}${result.data.sni ? " " + t("quick.sniLbl") + result.data.sni : ""}`;
-    $("#quickAddSaveBtn").disabled = false;
+    preview.className = 'quick-preview ok';
+    preview.innerHTML = `✓ ${result.data.host} — ${result.data.port} — ${result.data.username}${result.data.sni ? ' — SNI: ' + result.data.sni : ''}`;
+    $('#quickAddSaveBtn').disabled = false;
   } else {
     quickAddParsed = null;
-    preview.className = "quick-preview err";
-    preview.textContent = t("quick.fail");
-    $("#quickAddSaveBtn").disabled = true;
+    preview.className = 'quick-preview err';
+    preview.textContent = '✗ ' + I18N.t('toast.invalidQuickAdd');
+    $('#quickAddSaveBtn').disabled = true;
   }
 });
-
-$("#quickAddSaveBtn").addEventListener("click", async () => {
+$('#quickAddSaveBtn').addEventListener('click', async () => {
   if (!quickAddParsed) return;
-  await window.waslah.profiles.save({
-    name: quickAddParsed.host,
-    ...quickAddParsed,
-  });
-  toast(t("toast.profileSaved"));
-  $("#quickAddInput").value = "";
-  $("#quickPreview").textContent = "";
-  $("#quickAddSaveBtn").disabled = true;
+  await window.waslah.profiles.save({ name: quickAddParsed.host, ...quickAddParsed });
+  toast(I18N.t('toast.profileSaved'));
+  $('#quickAddInput').value = '';
+  $('#quickPreview').textContent = '';
+  $('#quickAddSaveBtn').disabled = true;
   await loadProfiles();
 });
 
-// ---------------- Manual add form ----------------
-$("#f_port").addEventListener("change", (e) => {
-  $("#f_port_custom").style.display =
-    e.target.value === "custom" ? "block" : "none";
+// ---- Manual add ----
+$('#f_port').addEventListener('change', (e) => {
+  $('#f_port_custom').style.display = e.target.value === 'custom' ? 'block' : 'none';
 });
-
 function readManualForm() {
-  const portSel = $("#f_port").value;
-  const port =
-    portSel === "custom" ? Number($("#f_port_custom").value) : Number(portSel);
+  const portSel = $('#f_port').value;
+  const port = portSel === 'custom' ? Number($('#f_port_custom').value) : Number(portSel);
   return {
-    name: $("#f_name").value.trim() || $("#f_host").value.trim(),
-    host: $("#f_host").value.trim(),
+    name: $('#f_name').value.trim() || $('#f_host').value.trim(),
+    host: $('#f_host').value.trim(),
     port,
-    username: $("#f_user").value.trim(),
-    password: $("#f_pass").value,
-    sni: $("#f_sni").value.trim(),
-    color: $("#f_color").value,
+    username: $('#f_user').value.trim(),
+    password: $('#f_pass').value,
+    sni: $('#f_sni').value.trim(),
+    color: $('#f_color').value,
   };
 }
-
-$("#testConnBtn").addEventListener("click", async () => {
+$('#testConnBtn').addEventListener('click', async () => {
   const { host, port } = readManualForm();
-  if (!host || !port) return toast(t("toast.fillHostPort"));
-  $("#testConnResult").textContent = t("profiles.testing");
+  if (!host || !port) return toast(I18N.t('toast.missingFields'));
+  $('#testConnResult').textContent = '...';
   const res = await window.waslah.conn.testPing(host, port);
-  $("#testConnResult").textContent = res.ok
-    ? `${t("test.ok")}${res.ms}ms`
-    : t("test.fail");
+  $('#testConnResult').textContent = res.ok ? `✓ ${res.ms}ms` : '✗';
 });
-
-$("#saveProfileBtn").addEventListener("click", async () => {
+$('#saveProfileBtn').addEventListener('click', async () => {
   const data = readManualForm();
-  if (!data.host || !data.username || !data.password || !data.port) {
-    return toast(t("toast.missingFields"));
-  }
+  if (!data.host || !data.username || !data.password || !data.port) return toast(I18N.t('toast.missingFields'));
   await window.waslah.profiles.save(data);
-  toast(t("toast.profileSaved"));
-  ["f_name", "f_host", "f_user", "f_pass", "f_sni"].forEach(
-    (id) => ($(`#${id}`).value = ""),
-  );
+  toast(I18N.t('toast.profileSaved'));
+  ['f_name', 'f_host', 'f_user', 'f_pass'].forEach((id) => ($(`#${id}`).value = ''));
   await loadProfiles();
 });
+$('#exportBtn').addEventListener('click', async () => { const r = await window.waslah.profiles.export(); if (r.ok) toast(I18N.t('toast.copied')); });
+$('#importBtn').addEventListener('click', async () => { const r = await window.waslah.profiles.import(); if (r.ok) { toast(I18N.t('toast.copied')); await loadProfiles(); } });
 
-$("#exportBtn").addEventListener("click", async () => {
-  const res = await window.waslah.profiles.export();
-  if (res.ok) toast(t("toast.exported"));
+// ================= SNI Manager =================
+async function loadSni() {
+  sniCache = await window.waslah.sni.list();
+  renderSniList();
+  loadSniOptionsInto($('#f_sni'), '');
+}
+function renderSniList() {
+  const box = $('#sniList');
+  if (!sniCache.length) { box.innerHTML = `<div class="empty-state">${I18N.t('sni.empty')}</div>`; return; }
+  box.innerHTML = sniCache.map((s) => `
+    <div class="sni-row">
+      <span class="sni-host mono">${s.host}</span>
+      <div class="sni-actions">
+        <button data-action="fav" data-id="${s.id}" class="star-btn ${s.favorite ? 'active' : ''}" data-icon="star"></button>
+        <button data-action="use" data-id="${s.id}" title="${I18N.t('sni.useAsDefault')}">↗</button>
+        <button data-action="del" data-id="${s.id}" data-icon="trash"></button>
+      </div>
+    </div>
+  `).join('');
+  applyIcons(box);
+
+  box.querySelectorAll('[data-action="del"]').forEach((b) => b.addEventListener('click', async () => {
+    await window.waslah.sni.delete(b.dataset.id); await loadSni();
+  }));
+  box.querySelectorAll('[data-action="fav"]').forEach((b) => b.addEventListener('click', async () => {
+    const entry = sniCache.find((s) => s.id === b.dataset.id);
+    await window.waslah.sni.save({ ...entry, favorite: !entry.favorite });
+    await loadSni();
+  }));
+  box.querySelectorAll('[data-action="use"]').forEach((b) => b.addEventListener('click', async () => {
+    const entry = sniCache.find((s) => s.id === b.dataset.id);
+    await window.waslah.settings.update({ defaultSni: entry.host });
+    $('#s_defaultsni').value = entry.host;
+    toast(I18N.t('toast.sniSaved'));
+  }));
+}
+$('#sniAddBtn').addEventListener('click', async () => {
+  const host = $('#sniInput').value.trim();
+  if (!host) return;
+  await window.waslah.sni.save({ host });
+  $('#sniInput').value = '';
+  await loadSni();
 });
 
-$("#importBtn").addEventListener("click", async () => {
-  const res = await window.waslah.profiles.import();
-  if (res.ok) {
-    toast(t("toast.imported"));
-    await loadProfiles();
+// ================= VLESS / V2Ray =================
+async function loadVless() {
+  vlessCache = await window.waslah.vless.list();
+  renderVlessList();
+}
+function renderVlessList() {
+  const box = $('#vlessList');
+  if (!vlessCache.length) { box.innerHTML = `<div class="empty-state">—</div>`; return; }
+  box.innerHTML = vlessCache.map((v) => `
+    <div class="vless-row">
+      <div>
+        <div>${v.name}</div>
+        <div class="mono muted small">${v.parsed?.host || ''}${v.parsed?.port ? ':' + v.parsed.port : ''}</div>
+      </div>
+      <div class="vless-actions">
+        <button data-action="del" data-id="${v.id}" data-icon="trash"></button>
+      </div>
+    </div>
+  `).join('');
+  applyIcons(box);
+  box.querySelectorAll('[data-action="del"]').forEach((b) => b.addEventListener('click', async () => {
+    await window.waslah.vless.delete(b.dataset.id); await loadVless();
+  }));
+}
+let vlessValidated = null;
+$('#vlessValidateBtn').addEventListener('click', async () => {
+  const raw = $('#vlessInput').value.trim();
+  const result = await window.waslah.vless.validate(raw);
+  const preview = $('#vlessPreview');
+  if (result.ok) {
+    vlessValidated = raw;
+    preview.className = 'quick-preview ok';
+    preview.textContent = '✓ ' + JSON.stringify(result.data).slice(0, 160);
+    $('#vlessSaveBtn').disabled = false;
+  } else {
+    vlessValidated = null;
+    preview.className = 'quick-preview err';
+    preview.textContent = '✗ ' + result.error;
+    $('#vlessSaveBtn').disabled = true;
   }
 });
+$('#vlessSaveBtn').addEventListener('click', async () => {
+  if (!vlessValidated) return;
+  await window.waslah.vless.save({ name: 'VLESS ' + (vlessCache.length + 1), raw: vlessValidated });
+  toast(I18N.t('toast.profileSaved'));
+  $('#vlessInput').value = '';
+  $('#vlessPreview').textContent = '';
+  $('#vlessSaveBtn').disabled = true;
+  await loadVless();
+});
+$('#vlessQrBtn').addEventListener('click', async () => {
+  const res = await window.waslah.vless.importQr();
+  if (res.ok) { $('#vlessInput').value = res.text; toast(I18N.t('toast.copied')); }
+  else if (res.error) toast('✗ ' + res.error);
+});
 
-// ---------------- Connection ----------------
+// ================= Network tools =================
+function bindTool(btnId, resultId, fn, formatter) {
+  $(btnId).addEventListener('click', async () => {
+    const resEl = $(resultId);
+    resEl.textContent = '...';
+    try {
+      const data = await fn();
+      resEl.textContent = formatter ? formatter(data) : JSON.stringify(data, null, 2);
+    } catch (err) {
+      resEl.textContent = '✗ ' + err.message;
+    }
+  });
+}
+
+bindTool('#toolMyIpBtn', '#toolMyIpResult', () => window.waslah.net.whatsMyIp(), (d) => d.ok ? d.ip : '✗ ' + d.error);
+bindTool('#toolDnsBtn', '#toolDnsResult', () => window.waslah.net.dnsLookup($('#toolDnsHost').value.trim()));
+bindTool('#toolTcpBtn', '#toolTcpResult', () => window.waslah.net.tcpPing($('#toolTcpHost').value.trim(), $('#toolTcpPort').value || 443), (d) => d.ok ? `✓ ${d.ms}ms` : `✗ ${d.error}`);
+bindTool('#toolHttpBtn', '#toolHttpResult', () => window.waslah.net.httpPing($('#toolHttpUrl').value.trim()), (d) => d.ok ? `✓ HTTP ${d.status} — ${d.ms}ms` : `✗ ${d.error}`);
+bindTool('#toolScanBtn', '#toolScanResult', () => {
+  const [start, end] = $('#toolScanRange').value.split('-').map((x) => Number(x.trim()));
+  return window.waslah.net.portScan($('#toolScanHost').value.trim(), start, end);
+}, (ports) => ports.length ? `Open: ${ports.join(', ')}` : 'No open ports found');
+bindTool('#toolTraceBtn', '#toolTraceResult', () => window.waslah.net.traceroute($('#toolTraceHost').value.trim()), (t) => t);
+bindTool('#toolSslBtn', '#toolSslResult', () => window.waslah.net.sslCheck($('#toolSslHost').value.trim()), (c) =>
+  `Subject: ${c.subject?.CN}\nIssuer: ${c.issuer?.O || c.issuer?.CN}\nValid: ${c.validFrom} → ${c.validTo}\nProtocol: ${c.protocol}`
+);
+bindTool('#toolWhoisBtn', '#toolWhoisResult', () => window.waslah.net.whois($('#toolWhoisHost').value.trim()), (t) => t);
+
+$('#toolB64EncodeBtn').addEventListener('click', () => {
+  $('#toolB64Result').textContent = btoa(unescape(encodeURIComponent($('#toolB64Input').value)));
+});
+$('#toolB64DecodeBtn').addEventListener('click', () => {
+  try { $('#toolB64Result').textContent = decodeURIComponent(escape(atob($('#toolB64Input').value))); }
+  catch { $('#toolB64Result').textContent = '✗ invalid base64'; }
+});
+$('#toolUrlEncodeBtn').addEventListener('click', () => { $('#toolUrlResult').textContent = encodeURIComponent($('#toolUrlInput').value); });
+$('#toolUrlDecodeBtn').addEventListener('click', () => {
+  try { $('#toolUrlResult').textContent = decodeURIComponent($('#toolUrlInput').value); }
+  catch { $('#toolUrlResult').textContent = '✗ invalid'; }
+});
+
+async function loadProviders() {
+  const providers = await window.waslah.providers.list();
+  $('#providersList').innerHTML = providers.map((p) => `
+    <div class="provider-row">
+      <div><strong>${p.name}</strong><div class="muted">${p.notes}</div></div>
+      <button data-url="${p.url}">${p.url.replace('https://', '')}</button>
+    </div>
+  `).join('');
+  $('#providersList').querySelectorAll('button').forEach((b) => {
+    b.addEventListener('click', () => window.waslah.app.openExternal(b.dataset.url));
+  });
+}
+
+// ================= Connection state =================
 function applyState(payload) {
-  lastStatusPayload = payload;
   const { state } = payload;
-  const pill = $("#globalStatusPill");
+  const pill = $('#globalStatusPill');
   pill.className = `status-pill ${state}`;
-  $("#globalStatusText").textContent = t(`status.${state}`);
+  $('#globalStatusText').textContent = I18N.t(`status.${state}`) || state;
+  $('#tunnelStatusText').textContent = I18N.t(`status.${state}`) || state;
 
-  const pulseLine = $("#pulseLine");
-  pulseLine.classList.toggle(
-    "active",
-    state === "connected" || state === "connecting" || state === "reconnecting",
-  );
+  const pulseLine = $('#pulseLine');
+  pulseLine.classList.toggle('active', ['connected', 'connecting', 'reconnecting'].includes(state));
 
-  $("#tunnelStatusText").textContent = t(`status.${state}`);
-
-  const connectBtn = $("#connectBtn");
-  const label = $("#connectBtnLabel");
-  if (state === "connected") {
-    connectBtn.classList.remove("btn-primary");
-    connectBtn.classList.add("btn-danger");
+  const connectBtn = $('#connectBtn');
+  const label = $('#connectBtnLabel');
+  if (state === 'connected') {
+    connectBtn.className = 'btn btn-danger btn-block';
     connectBtn.disabled = false;
-    label.textContent = t("dashboard.disconnectBtn");
+    label.textContent = I18N.t('dashboard.disconnect');
     startUptimeTimer();
-  } else if (state === "connecting" || state === "disconnecting") {
-    connectBtn.classList.add("btn-primary");
-    connectBtn.classList.remove("btn-danger");
+  } else if (state === 'connecting' || state === 'disconnecting') {
+    connectBtn.className = 'btn btn-primary btn-block';
     connectBtn.disabled = true;
-    label.textContent = t("dashboard.working");
-  } else if (state === "reconnecting") {
-    connectBtn.classList.remove("btn-primary");
-    connectBtn.classList.add("btn-danger");
+    label.textContent = '...';
+  } else if (state === 'reconnecting') {
+    connectBtn.className = 'btn btn-danger btn-block';
     connectBtn.disabled = false;
-    label.textContent = t("dashboard.cancelBtn");
+    label.textContent = I18N.t('dashboard.cancel');
   } else {
-    connectBtn.classList.add("btn-primary");
-    connectBtn.classList.remove("btn-danger");
+    connectBtn.className = 'btn btn-primary btn-block';
     connectBtn.disabled = false;
-    label.textContent = t("dashboard.connectBtn");
+    label.textContent = I18N.t('dashboard.connect');
     stopUptimeTimer();
   }
 }
-
 function startUptimeTimer() {
   stopUptimeTimer();
   uptimeTimer = setInterval(async () => {
     const status = await window.waslah.conn.status();
     const s = Math.floor((status.uptimeMs || 0) / 1000);
-    const hh = String(Math.floor(s / 3600)).padStart(2, "0");
-    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-    const ss = String(s % 60).padStart(2, "0");
-    $("#statUptime").textContent = `${hh}:${mm}:${ss}`;
-    $("#statDown").textContent = formatBytes(status.bytesIn);
-    $("#statUp").textContent = formatBytes(status.bytesOut);
+    const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    $('#statUptime').textContent = `${hh}:${mm}:${ss}`;
+    $('#statDown').textContent = formatBytes(status.bytesIn);
+    $('#statUp').textContent = formatBytes(status.bytesOut);
   }, 1000);
 }
 function stopUptimeTimer() {
   if (uptimeTimer) clearInterval(uptimeTimer);
-  $("#statUptime").textContent = "00:00:00";
-  $("#statDown").textContent = "0 KB";
-  $("#statUp").textContent = "0 KB";
+  $('#statUptime').textContent = '00:00:00';
+  $('#statDown').textContent = '0 KB';
+  $('#statUp').textContent = '0 KB';
 }
-
 function formatBytes(n) {
-  if (!n) return "0 KB";
+  if (!n) return '0 KB';
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
 }
-
-$("#connectBtn").addEventListener("click", async () => {
+$('#connectBtn').addEventListener('click', async () => {
   const status = await window.waslah.conn.status();
-  if (
-    status.state === "connected" ||
-    status.state === "connecting" ||
-    status.state === "reconnecting"
-  ) {
+  if (['connected', 'connecting', 'reconnecting'].includes(status.state)) {
     await window.waslah.conn.disconnect();
   } else {
-    if (!selectedProfileId) return toast(t("toast.chooseProfileFirst"));
-    try {
-      await window.waslah.conn.connect(selectedProfileId);
-    } catch (err) {
-      toast(t("toast.connectFailed") + err.message);
-    }
+    if (!selectedProfileId) return toast(I18N.t('toast.pickProfile'));
+    try { await window.waslah.conn.connect(selectedProfileId); }
+    catch (err) { toast('✗ ' + err.message); }
   }
 });
 
-// ---------------- Logs ----------------
-window.waslah.on.log((line) => {
-  const box = $("#consoleBox");
-  box.textContent += line + "\n";
-  box.scrollTop = box.scrollHeight;
-});
-
-window.waslah.on.state((payload) => applyState(payload));
-
-$("#clearLogsBtn").addEventListener(
-  "click",
-  () => ($("#consoleBox").textContent = ""),
-);
-$("#copyLogsBtn").addEventListener("click", () => {
-  navigator.clipboard.writeText($("#consoleBox").textContent);
-  toast(t("toast.logsCopied"));
-});
-
-// ---------------- Settings ----------------
-async function loadSettings() {
-  const s = await window.waslah.settings.get();
-  $("#s_defaultsni").value = s.defaultSni || "";
-  $("#s_killswitch").checked = !!s.killSwitch;
-  $("#s_reconnect").checked = !!s.reconnect?.enabled;
-  $("#s_autoconnect").checked = !!s.autoConnectLastProfile;
-  $("#s_autostart").checked = !!s.autoStartWindows;
-  $("#s_maxretries").value = s.reconnect?.maxRetries ?? 5;
+// ================= Logs =================
+function statusBadge(status) {
+  return `<span class="badge badge-${status}">${status}</span>`;
+}
+function renderMiniLogs() {
+  const box = $('#miniLogList');
+  const last5 = recentLogEntries.slice(-5).reverse();
+  box.innerHTML = last5.map((e) => `
+    <div class="mini-log-row">${statusBadge(e.status)} <span>${e.message}</span></div>
+  `).join('') || `<div class="empty-state">—</div>`;
 }
 
-let defaultSniSaveTimer = null;
-$("#s_defaultsni").addEventListener("input", (e) => {
-  clearTimeout(defaultSniSaveTimer);
-  defaultSniSaveTimer = setTimeout(async () => {
-    await window.waslah.settings.update({ defaultSni: e.target.value.trim() });
-    toast(t("toast.sniSaved"));
-  }, 500);
-});
+function renderLogCategoryOptions() {
+  const sel = $('#logCategoryFilter');
+  const current = sel.value || 'all';
+  const categories = ['all', 'manager', 'ssh', 'tls', 'socks', 'vpn', 'tun2socks', 'killswitch', 'general'];
+  sel.innerHTML = categories.map((c) => `<option value="${c}">${c === 'all' ? I18N.t('logs.filterAll') : c}</option>`).join('');
+  sel.value = current;
+}
 
+async function refreshLogTable() {
+  const filter = {
+    search: $('#logSearch').value.trim(),
+    category: $('#logCategoryFilter').value || 'all',
+    status: $('#logStatusFilter').value || 'all',
+  };
+  const rows = await window.waslah.logs.list(filter);
+  const body = $('#logTableBody');
+  body.innerHTML = rows.slice(-500).reverse().map((e) => `
+    <tr>
+      <td class="time">${new Date(e.ts).toLocaleTimeString()}</td>
+      <td>${e.category}</td>
+      <td>${statusBadge(e.status)}</td>
+      <td class="msg">${escapeHtml(e.message)}</td>
+    </tr>
+  `).join('');
+}
+function escapeHtml(s) { return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+$('#logSearch').addEventListener('input', debounce(refreshLogTable, 250));
+$('#logCategoryFilter').addEventListener('change', refreshLogTable);
+$('#logStatusFilter').addEventListener('change', refreshLogTable);
+$('#logsClearBtn').addEventListener('click', async () => { await window.waslah.logs.clear(); recentLogEntries = []; renderMiniLogs(); refreshLogTable(); });
+$('#logsExportBtn').addEventListener('click', async () => { const r = await window.waslah.logs.export(); if (r.ok) toast(I18N.t('toast.copied')); });
+$('#logsCopyBtn').addEventListener('click', async () => {
+  const rows = await window.waslah.logs.list({});
+  navigator.clipboard.writeText(rows.map((r) => `[${new Date(r.ts).toISOString()}] [${r.category}] [${r.status}] ${r.message}`).join('\n'));
+  toast(I18N.t('toast.copied'));
+});
+$('#logEnabledToggle').addEventListener('change', async (e) => { await window.waslah.logs.setEnabled(e.target.checked); });
+
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+window.waslah.on.logEntry((entry) => {
+  recentLogEntries.push(entry);
+  if (recentLogEntries.length > 200) recentLogEntries.shift();
+  renderMiniLogs();
+  if ($('#page-logs').classList.contains('active')) refreshLogTable();
+});
+window.waslah.on.state((payload) => applyState(payload));
+
+// ================= Settings =================
+async function loadSettings() {
+  currentSettings = await window.waslah.settings.get();
+  $('#s_defaultsni').value = currentSettings.defaultSni || '';
+  $('#s_killswitch').checked = !!currentSettings.killSwitch;
+  $('#s_reconnect').checked = !!currentSettings.reconnect?.enabled;
+  $('#s_autoconnect').checked = !!currentSettings.autoConnectLastProfile;
+  $('#s_autostart').checked = !!currentSettings.autoStartWindows;
+  $('#s_maxretries').value = currentSettings.reconnect?.maxRetries ?? 5;
+  $('#logEnabledToggle').checked = currentSettings.loggingEnabled !== false;
+  applyTheme(currentSettings.theme || 'dark');
+}
 function bindSettingToggle(id, key, isNested) {
-  $(id).addEventListener("change", async (e) => {
+  $(id).addEventListener('change', async (e) => {
     const value = e.target.checked;
     if (isNested) {
       const s = await window.waslah.settings.get();
-      await window.waslah.settings.update({
-        reconnect: { ...s.reconnect, enabled: value },
-      });
+      await window.waslah.settings.update({ reconnect: { ...s.reconnect, enabled: value } });
     } else {
       await window.waslah.settings.update({ [key]: value });
     }
   });
 }
-bindSettingToggle("#s_killswitch", "killSwitch");
-bindSettingToggle("#s_reconnect", null, true);
-bindSettingToggle("#s_autoconnect", "autoConnectLastProfile");
-bindSettingToggle("#s_autostart", "autoStartWindows");
-
-$("#s_maxretries").addEventListener("change", async (e) => {
+bindSettingToggle('#s_killswitch', 'killSwitch');
+bindSettingToggle('#s_reconnect', null, true);
+bindSettingToggle('#s_autoconnect', 'autoConnectLastProfile');
+bindSettingToggle('#s_autostart', 'autoStartWindows');
+$('#s_maxretries').addEventListener('change', async (e) => {
   const s = await window.waslah.settings.get();
-  await window.waslah.settings.update({
-    reconnect: { ...s.reconnect, maxRetries: Number(e.target.value) },
-  });
+  await window.waslah.settings.update({ reconnect: { ...s.reconnect, maxRetries: Number(e.target.value) } });
+});
+let defaultSniSaveTimer = null;
+$('#s_defaultsni').addEventListener('input', (e) => {
+  clearTimeout(defaultSniSaveTimer);
+  defaultSniSaveTimer = setTimeout(async () => {
+    await window.waslah.settings.update({ defaultSni: e.target.value.trim() });
+    toast(I18N.t('toast.sniSaved'));
+  }, 500);
 });
 
-// ---------------- About ----------------
-$$(".link-btn").forEach((btn) => {
-  btn.addEventListener("click", () =>
-    window.waslah.app.openExternal(btn.dataset.link),
-  );
-});
+// ================= About =================
+$$('.link-btn').forEach((btn) => btn.addEventListener('click', () => window.waslah.app.openExternal(btn.dataset.link)));
 
-// ---------------- Init ----------------
+// ================= Init =================
 (async function init() {
-  document.documentElement.lang = currentLang;
-  document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
-  applyTranslations();
-  updateLangSwitchUI();
+  const settings = await window.waslah.settings.get();
+  await applyLanguage(settings.language || 'ar');
+  applyIcons();
 
   await loadProfiles();
+  await loadSni();
+  await loadVless();
+  await loadProviders();
   await loadSettings();
+  renderLogCategoryOptions();
+
+  const initialLogs = await window.waslah.logs.list({ limit: 5 });
+  recentLogEntries = initialLogs;
+  renderMiniLogs();
+
   const status = await window.waslah.conn.status();
   applyState(status);
-  $("#appVersion").textContent = await window.waslah.app.getVersion();
+  $('#appVersion').textContent = await window.waslah.app.getVersion();
 })();
