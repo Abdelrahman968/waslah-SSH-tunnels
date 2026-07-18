@@ -1,0 +1,73 @@
+WASLAH END USER LICENSE AGREEMENT (EULA)
+
+Version 1.1.0
+Copyright (c) 2026 Abdelrahman Ayman
+All Rights Reserved.
+
+IMPORTANT:
+Please read this End User License Agreement ("Agreement") carefully before installing or using the Waslah software ("Software"). By selecting "I Agree", installing, or using the Software, you agree to be bound by the terms of this Agreement.
+
+1. LICENSE
+Waslah is licensed, not sold. You are granted a non-exclusive, non-transferable, revocable license to install and use the Software for personal or commercial purposes in accordance with this Agreement.
+
+2. ACCEPTABLE USE
+You agree to use the Software only for lawful purposes and in compliance with all applicable local, national, and international laws.
+
+You must NOT use Waslah for:
+- Unauthorized access to systems or networks.
+- Illegal activities.
+- Distribution of malware or malicious software.
+- Copyright infringement.
+- Any activity prohibited by applicable law.
+
+3. USER RESPONSIBILITY
+You are solely responsible for:
+- SSH accounts and servers you use.
+- Configuration of the Software.
+- All traffic routed through the Software.
+- Compliance with your Internet Service Provider's policies and applicable laws.
+
+4. THIRD-PARTY SERVICES
+Waslah may connect to third-party SSH servers or services. Those services are owned and operated by their respective providers, and Waslah is not responsible for their availability, security, privacy practices, or content.
+
+5. DISCLAIMER OF WARRANTY
+The Software is provided "AS IS" without warranties of any kind, whether express or implied, including but not limited to merchantability, fitness for a particular purpose, or non-infringement.
+
+6. LIMITATION OF LIABILITY
+To the maximum extent permitted by law, the author shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from the use or inability to use the Software.
+
+7. UPDATES
+Future versions of the Software may modify, improve, or remove features without prior notice.
+
+8. TERMINATION
+This license automatically terminates if you violate any provision of this Agreement.
+
+9. PRIVACY
+Waslah does not intentionally collect personal information. Any connection data, SSH credentials, or configuration files are stored locally on your device unless you choose otherwise.
+
+10. OPEN SOURCE COMPONENTS
+The Software includes third-party open-source libraries distributed under their respective licenses.
+
+11. GOVERNING LAW
+This Agreement shall be governed by the applicable laws of the user's jurisdiction unless otherwise required by law.
+
+12. CONTACT
+Developer:
+Abdelrahman Ayman
+
+GitHub:
+https://github.com/Abdelrahman968/waslah-SSH-tunnels
+
+Website:
+https://abdelrahman-portfolio-rho.vercel.app
+
+----------------------------------------------------------
+
+BY CLICKING "I AGREE", YOU ACKNOWLEDGE THAT:
+
+- You have read this Agreement.
+- You understand this Agreement.
+- You agree to be legally bound by its terms.
+- You will use Waslah responsibly and lawfully.
+
+If you do not agree with these terms, click "I Do Not Agree" and cancel the installation.

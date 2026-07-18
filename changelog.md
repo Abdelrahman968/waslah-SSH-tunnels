@@ -6,6 +6,10 @@ The format follows the principles of Keep a Changelog and Semantic Versioning.
 
 ---
 
+## [1.1.0] - 2026-07-18
+
+### ADD & FIX - Lazy, enter the changes
+
 ## [1.0.0] - 2026-07-01
 
 ### Initial Public Release

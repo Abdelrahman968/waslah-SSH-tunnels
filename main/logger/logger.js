@@ -2,7 +2,7 @@
 
 const { EventEmitter } = require('events');
 
-const MAX_ENTRIES = 3000;
+const MAX_ENTRIES = 1500;
 
 const CATEGORY_MAP = {
   manager: 'manager',
@@ -40,14 +40,48 @@ class AppLogger extends EventEmitter {
     this.entries = [];
     this.enabled = true;
     this.nextId = 1;
+    this._lastSignature = null;
+    this._repeatCount = 0;
+    this._lastFlush = 0;
   }
 
   setEnabled(enabled) {
     this.enabled = enabled;
   }
 
+  /**
+   * Collapses noisy, rapidly-repeating identical log lines (the classic
+   * case being repeated UDP forwarding errors from tun2socks/xray) into a
+   * single "repeated Nx" summary instead of flooding the log — one entry
+   * per occurrence would make the log unreadable and waste memory/IPC
+   * bandwidth during a sustained issue.
+   */
   push(rawLine) {
     if (!this.enabled) return;
+
+    const signature = rawLine.replace(/\d+/g, '#').slice(0, 120);
+    const now = Date.now();
+
+    if (signature === this._lastSignature) {
+      this._repeatCount++;
+      // Only surface a fresh entry every 10 repeats or every 15s, whichever
+      // comes first — enough to show the problem is ongoing without
+      // spamming.
+      if (this._repeatCount % 10 !== 0 && now - this._lastFlush < 15000) {
+        return undefined;
+      }
+      const entry = this._makeEntry(`${rawLine}  (repeated ${this._repeatCount}x)`);
+      this._lastFlush = now;
+      return entry;
+    }
+
+    this._lastSignature = signature;
+    this._repeatCount = 1;
+    this._lastFlush = now;
+    return this._makeEntry(rawLine);
+  }
+
+  _makeEntry(rawLine) {
     const entry = {
       id: this.nextId++,
       ts: Date.now(),

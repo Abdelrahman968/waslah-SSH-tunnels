@@ -97,6 +97,13 @@ async function httpPing(url, timeoutMs = 8000) {
 }
 
 async function portScan(host, startPort, endPort, concurrency = 60) {
+  if (!Number.isFinite(startPort) || !Number.isFinite(endPort) || startPort < 1 || endPort > 65535 || startPort > endPort) {
+    throw new Error('INVALID_PORT_RANGE');
+  }
+  if (endPort - startPort + 1 > 1000) {
+    throw new Error('RANGE_TOO_LARGE_MAX_1000_PORTS');
+  }
+
   const ports = [];
   for (let p = startPort; p <= endPort; p++) ports.push(p);
   const open = [];
@@ -157,10 +164,21 @@ function whoisQuery(domain, server = 'whois.iana.org', timeoutMs = 8000) {
 
 async function whois(domain) {
   const iana = await whoisQuery(domain, 'whois.iana.org');
-  const match = iana.match(/refer:\s*(\S+)/i);
+  // IANA's root response uses different field names depending on the TLD
+  // registry era: legacy TLDs (.com/.net) use "refer:", most modern gTLDs
+  // (.io/.dev/.app/.xyz/...) use "whois:". Missing the second one meant
+  // whois silently failed (fell back to the useless root response) for a
+  // large share of domains.
+  const match = iana.match(/(?:refer|whois):\s*(\S+)/i);
   if (match) {
     try {
       const full = await whoisQuery(domain, match[1]);
+      // Some registries (e.g. Verisign for .com/.net) return a second-level
+      // referral of their own; follow one more hop if present.
+      const secondHop = full.match(/(?:refer|whois server):\s*(\S+)/i);
+      if (secondHop && secondHop[1] !== match[1]) {
+        try { return await whoisQuery(domain, secondHop[1]); } catch { return full; }
+      }
       return full;
     } catch {
       return iana;
@@ -176,6 +194,61 @@ async function traceroute(host) {
   return execAsync(`tracert -d -h 20 -w 800 ${host}`, 25000);
 }
 
+/**
+ * Simple download speed test: fetches a known-size file from a public CDN
+ * and measures throughput. Not lab-grade accurate, but good enough for a
+ * quick "is my tunnel usable" sanity check.
+ */
+function speedTest(timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    const url = 'https://speed.cloudflare.com/__down?bytes=25000000';
+    const start = Date.now();
+    let bytes = 0;
+    const req = https.get(url, { timeout: timeoutMs }, (res) => {
+      res.on('data', (chunk) => (bytes += chunk.length));
+      res.on('end', () => {
+        const seconds = (Date.now() - start) / 1000;
+        const mbps = ((bytes * 8) / 1_000_000 / seconds).toFixed(2);
+        resolve({ bytes, seconds: seconds.toFixed(2), mbps });
+      });
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      const seconds = (Date.now() - start) / 1000;
+      if (bytes > 0) {
+        const mbps = ((bytes * 8) / 1_000_000 / seconds).toFixed(2);
+        resolve({ bytes, seconds: seconds.toFixed(2), mbps, partial: true });
+      } else {
+        reject(new Error('TIMEOUT'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
+/**
+ * DNS leak check: compares your HTTP-visible public IP against the public
+ * IP your system's active DNS resolver appears to use. Akamai's edge
+ * network exposes a diagnostic hostname, `whoami.akamai.net`, whose A
+ * record answer is the address of whichever resolver actually reached
+ * their servers — querying it through the OS's default resolver reveals
+ * whether DNS traffic is really flowing through the tunnel (matching the
+ * tunnel's exit IP) or leaking out via the ISP's resolver directly
+ * (a different IP than your tunneled public IP).
+ */
+async function dnsLeakCheck() {
+  const [ipResult, resolverIps] = await Promise.all([
+    whatsMyIp(),
+    dns.resolve4('whoami.akamai.net').catch(() => []),
+  ]);
+
+  const publicIp = ipResult.ok ? ipResult.ip : null;
+  const hasData = !!publicIp && resolverIps.length > 0;
+  const possibleLeak = hasData && !resolverIps.includes(publicIp);
+
+  return { publicIp, resolverIps, possibleLeak, hasData };
+}
+
 module.exports = {
   whatsMyIp,
   dnsLookup,
@@ -185,4 +258,6 @@ module.exports = {
   sslCheck,
   whois,
   traceroute,
+  speedTest,
+  dnsLeakCheck,
 };

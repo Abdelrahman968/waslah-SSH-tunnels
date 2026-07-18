@@ -86,7 +86,7 @@ class VpnManager extends EventEmitter {
     this.proc.on('exit', (code) => {
       const wasActive = this.active;
       this.active = false;
-      this.emit('log', `[tun2socks] خرج بالكود ${code}`);
+      this.emit('log', `[tun2socks] Exited with code ${code}`);
       if (code !== 0 && wasActive) this.emit('killswitch-trigger');
       else if (code !== 0) this.emit('vpn-start-failed', code);
     });
@@ -101,7 +101,7 @@ class VpnManager extends EventEmitter {
     await execAsync(`route add 0.0.0.0 mask 0.0.0.0 0.0.0.0 metric 1 if ${adapterIndex}`);
 
     this.active = true;
-    this.emit('log', '[vpn] VPN شغال على مستوى النظام بالكامل');
+    this.emit('log', '[vpn] System-wide VPN is active');
   }
 
   async _waitForAdapter(maxAttempts = 8, intervalMs = 1000) {
@@ -110,7 +110,7 @@ class VpnManager extends EventEmitter {
       try {
         return await this._getAdapterIndex();
       } catch {
-        this.emit('log', `[vpn] لسه بنستنى الـ TUN adapter يظهر... (${i + 1}/${maxAttempts})`);
+        this.emit('log', `[vpn] Still waiting for TUN adapter to appear... (${i + 1}/${maxAttempts})`);
       }
     }
     throw new Error('ADAPTER_NOT_FOUND');
@@ -131,7 +131,7 @@ class VpnManager extends EventEmitter {
    */
   async engageKillSwitch() {
     await execAsync(`route delete 0.0.0.0 mask 0.0.0.0`).catch(() => {});
-    this.emit('log', '[killswitch] الإنترنت اتقفل لحد ما تعيد الاتصال (kill switch فعّال)');
+    this.emit('log', '[killswitch] Internet blocked until you reconnect (kill switch active)');
   }
 
   async stop({ restoreGateway = true } = {}) {
@@ -149,7 +149,7 @@ class VpnManager extends EventEmitter {
       await execAsync(`route delete ${this.serverIp} mask 255.255.255.255`).catch(() => {});
     }
     this.active = false;
-    this.emit('log', '[vpn] رجّعنا الراوتنج الأصلي');
+    this.emit('log', '[vpn] Original routing restored');
   }
 }
 

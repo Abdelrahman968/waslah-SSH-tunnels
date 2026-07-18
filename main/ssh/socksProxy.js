@@ -28,7 +28,7 @@ class LocalSocksProxy extends EventEmitter {
           info.dstPort,
           (err, stream) => {
             if (err) {
-              this.emit('log', `[socks] رفض اتصال لـ ${info.dstAddr}:${info.dstPort} (${err.message})`);
+              this.emit('log', `[socks] Rejected connection to ${info.dstAddr}:${info.dstPort} (${err.message})`);
               return deny();
             }
             const client = accept(true);
@@ -50,7 +50,7 @@ class LocalSocksProxy extends EventEmitter {
 
       this.server.useAuth(socks.auth.None());
       this.server.listen(this.port, '127.0.0.1', () => {
-        this.emit('log', `[socks] بروكسي SOCKS5 محلي شغال على 127.0.0.1:${this.port}`);
+        this.emit('log', `[socks] Local SOCKS5 proxy running on 127.0.0.1:${this.port}`);
         resolve(this.port);
       });
       this.server.on('error', reject);

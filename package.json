@@ -1,7 +1,7 @@
 {
   "name": "waslah",
   "productName": "Waslah",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "SSH-based VPN tunnel client with SNI bypass support - Windows",
   "main": "main/main.js",
   "author": {
@@ -9,15 +9,27 @@
     "url": "https://abdelrahman-portfolio-rho.vercel.app"
   },
   "homepage": "https://abdelrahman-portfolio-rho.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Abdelrahman968/waslah-SSH-tunnels.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Abdelrahman968/waslah-SSH-tunnels/issues"
+  },
   "license": "MIT",
   "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "pack": "electron-builder --dir",
     "build": "electron-builder --win",
     "build:x64": "electron-builder --win --x64",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "postinstall": "electron-builder install-app-deps",
+    "rebuild": "electron-rebuild -f -w ssh2,socksv5"
   },
   "dependencies": {
     "electron-store": "^8.2.0",
@@ -28,7 +40,8 @@
   },
   "devDependencies": {
     "electron": "^30.0.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "electron-rebuild": "^3.2.9"
   },
   "build": {
     "appId": "com.abdelrahman968.waslah",
@@ -50,6 +63,8 @@
       "!**/*.log",
       "!**/.git/**",
       "!**/.github/**",
+      "!**/docs/**",
+      "!**/*.md",
       "!node_modules/**/{test,__tests__,tests,example,examples}",
       "!node_modules/**/{README.md,README,readme.md,CHANGELOG.md}"
     ],
@@ -89,7 +104,8 @@
       "deleteAppDataOnUninstall": false,
       "installerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico"
+      "uninstallerIcon": "assets/icon.ico",
+      "license": "build/license.txt"
     }
   }
 }

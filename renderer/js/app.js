@@ -5,7 +5,6 @@ const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 let profilesCache = [];
 let sniCache = [];
-let vlessCache = [];
 let selectedProfileId = null;
 let uptimeTimer = null;
 let currentSettings = null;
@@ -37,6 +36,60 @@ function toast(msg) {
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 2400);
 }
+
+$('#copyIpBtn').addEventListener('click', async () => {
+  const r = await window.waslah.net.whatsMyIp();
+  if (r.ok) { navigator.clipboard.writeText(r.ip); toast(r.ip + ' — ' + I18N.t('toast.copied')); }
+  else toast('✗ ' + r.error);
+});
+
+async function loadVpnOnlyApps() {
+  const box = $('#vpnOnlyAppsList');
+  const apps = await window.waslah.appfw.list();
+  if (!apps.length) { box.innerHTML = `<div class="empty-state">—</div>`; return; }
+  box.innerHTML = apps.map((a) => `
+    <div class="sni-row">
+      <span class="mono small">${a.label}</span>
+      <button data-id="${a.id}" data-icon="trash"></button>
+    </div>
+  `).join('');
+  applyIcons(box);
+  box.querySelectorAll('button[data-id]').forEach((b) => b.addEventListener('click', async () => {
+    await window.waslah.appfw.remove(b.dataset.id);
+    await loadVpnOnlyApps();
+  }));
+}
+$('#addVpnOnlyAppBtn').addEventListener('click', async () => {
+  const r = await window.waslah.appfw.add();
+  if (r.ok) await loadVpnOnlyApps();
+});
+
+$$('.legal-tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    $$('.legal-tab').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    $$('.legal-panel').forEach((p) => (p.style.display = 'none'));
+    $(`#legalPanel-${tab.dataset.tab}`).style.display = 'block';
+  });
+});
+const legalDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+if ($('#legalDateTerms')) $('#legalDateTerms').textContent = legalDate;
+if ($('#legalDatePrivacy')) $('#legalDatePrivacy').textContent = legalDate;
+
+$('#togglePassBtn').addEventListener('click', () => {
+  const input = $('#f_pass');
+  input.type = input.type === 'password' ? 'text' : 'password';
+});
+
+// ================= Elevation banner =================
+function applyElevation({ elevated, platform }) {
+  const banner = $('#elevationBanner');
+  banner.style.display = platform === 'win32' && !elevated ? 'flex' : 'none';
+}
+$('#elevationRelaunchBtn').addEventListener('click', async () => {
+  await window.waslah.elevation.relaunch();
+});
+window.waslah.on.elevationStatus((payload) => applyElevation(payload));
 
 // ================= Theme =================
 function applyTheme(theme) {
@@ -102,8 +155,29 @@ function renderProfileSelect() {
     selectedProfileId = selectedProfileId || profilesCache[0].id;
     sel.value = selectedProfileId;
     updateProfileMeta();
+    refreshDashboardSniOptions();
   }
 }
+
+function refreshDashboardSniOptions() {
+  const sel = $('#dashboardSniSelect');
+  const current = sel.value;
+  sel.innerHTML = `<option value="" data-i18n="dashboard.sniUseDefault">${I18N.t('dashboard.sniUseDefault')}</option>`;
+  sniCache.forEach((s) => {
+    const opt = document.createElement('option');
+    opt.value = s.host;
+    opt.textContent = s.host + (s.favorite ? ' ★' : '');
+    sel.appendChild(opt);
+  });
+  const customOpt = document.createElement('option');
+  customOpt.value = '__custom__';
+  customOpt.textContent = I18N.t('dashboard.sniCustom');
+  sel.appendChild(customOpt);
+  sel.value = current || '';
+}
+$('#dashboardSniSelect').addEventListener('change', (e) => {
+  $('#dashboardSniCustomInput').style.display = e.target.value === '__custom__' ? 'block' : 'none';
+});
 
 $('#profileSelect').addEventListener('change', (e) => {
   selectedProfileId = e.target.value;
@@ -137,8 +211,11 @@ function renderProfileTable() {
       <td class="mono">${p.host}</td>
       <td class="mono">${p.port}</td>
       <td class="mono">${p.sni || '—'}</td>
+      <td class="mono small">${formatBytes((p.totalBytesIn || 0) + (p.totalBytesOut || 0))}</td>
       <td>
         <div class="table-actions">
+          <button data-action="edit" data-id="${p.id}" data-icon="edit" title="Edit"></button>
+          <button data-action="duplicate" data-id="${p.id}" data-icon="duplicate" title="Duplicate"></button>
           <button data-action="copy" data-id="${p.id}" data-icon="copy"></button>
           <button data-action="delete" data-id="${p.id}" data-icon="trash"></button>
         </div>
@@ -160,7 +237,61 @@ function renderProfileTable() {
       if (str) { navigator.clipboard.writeText(str); toast(I18N.t('toast.copied')); }
     });
   });
+  body.querySelectorAll('[data-action="edit"]').forEach((btn) => {
+    btn.addEventListener('click', () => enterEditMode(btn.dataset.id));
+  });
+  body.querySelectorAll('[data-action="duplicate"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const full = await window.waslah.profiles.getSecret(btn.dataset.id);
+      if (!full) return;
+      const { id, createdAt, updatedAt, ...rest } = full;
+      await window.waslah.profiles.save({ ...rest, name: rest.name + ' (copy)' });
+      toast(I18N.t('profiles.duplicated'));
+      await loadProfiles();
+    });
+  });
 }
+
+let editingProfileId = null;
+
+async function enterEditMode(id) {
+  const full = await window.waslah.profiles.getSecret(id);
+  if (!full) return;
+  editingProfileId = id;
+  $('#f_name').value = full.name || '';
+  $('#f_host').value = full.host || '';
+  $('#f_user').value = full.username || '';
+  $('#f_pass').value = full.password || '';
+  $('#f_color').value = full.color || '#2DD4BF';
+
+  const portSelect = $('#f_port');
+  const knownPorts = ['443', '80', '22'];
+  if (knownPorts.includes(String(full.port))) {
+    portSelect.value = String(full.port);
+    $('#f_port_custom').style.display = 'none';
+  } else {
+    portSelect.value = 'custom';
+    $('#f_port_custom').style.display = 'block';
+    $('#f_port_custom').value = full.port;
+  }
+
+  await loadSniOptionsInto($('#f_sni'), full.sni || '');
+
+  $('#manualFormTitle').textContent = I18N.t('profiles.saveChanges');
+  $('#saveProfileBtn').textContent = I18N.t('profiles.saveChanges');
+  $('#cancelEditBtn').style.display = 'inline-block';
+  $('.nav-item[data-page="profiles"]').click();
+  $('#f_host').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function exitEditMode() {
+  editingProfileId = null;
+  $('#manualFormTitle').textContent = I18N.t('profiles.manualAdd');
+  $('#saveProfileBtn').textContent = I18N.t('profiles.save');
+  $('#cancelEditBtn').style.display = 'none';
+  ['f_name', 'f_host', 'f_user', 'f_pass'].forEach((id) => ($(`#${id}`).value = ''));
+}
+$('#cancelEditBtn').addEventListener('click', exitEditMode);
 $('#profileSearch').addEventListener('input', renderProfileTable);
 
 // ---- Quick add ----
@@ -199,6 +330,7 @@ function readManualForm() {
   const portSel = $('#f_port').value;
   const port = portSel === 'custom' ? Number($('#f_port_custom').value) : Number(portSel);
   return {
+    id: editingProfileId || undefined,
     name: $('#f_name').value.trim() || $('#f_host').value.trim(),
     host: $('#f_host').value.trim(),
     port,
@@ -218,13 +350,33 @@ $('#testConnBtn').addEventListener('click', async () => {
 $('#saveProfileBtn').addEventListener('click', async () => {
   const data = readManualForm();
   if (!data.host || !data.username || !data.password || !data.port) return toast(I18N.t('toast.missingFields'));
+  const wasEditing = !!editingProfileId;
   await window.waslah.profiles.save(data);
-  toast(I18N.t('toast.profileSaved'));
-  ['f_name', 'f_host', 'f_user', 'f_pass'].forEach((id) => ($(`#${id}`).value = ''));
+  toast(wasEditing ? I18N.t('profiles.saveChanges') : I18N.t('toast.profileSaved'));
+  exitEditMode();
   await loadProfiles();
 });
 $('#exportBtn').addEventListener('click', async () => { const r = await window.waslah.profiles.export(); if (r.ok) toast(I18N.t('toast.copied')); });
 $('#importBtn').addEventListener('click', async () => { const r = await window.waslah.profiles.import(); if (r.ok) { toast(I18N.t('toast.copied')); await loadProfiles(); } });
+
+$('#exportWaLockedBtn').addEventListener('click', async () => {
+  const passphrase = prompt('Set a passphrase to lock this .wa file:');
+  if (!passphrase) return;
+  const r = await window.waslah.profiles.exportWa(true, passphrase);
+  if (r.ok) toast(I18N.t('toast.copied'));
+  else toast('✗ ' + r.error);
+});
+$('#exportWaUnlockedBtn').addEventListener('click', async () => {
+  const r = await window.waslah.profiles.exportWa(false, null);
+  if (r.ok) toast(I18N.t('toast.copied'));
+  else toast('✗ ' + r.error);
+});
+$('#importWaBtn').addEventListener('click', async () => {
+  const passphrase = prompt('Passphrase (leave blank if this .wa file is unlocked):') || null;
+  const r = await window.waslah.profiles.importWa(passphrase);
+  if (r.ok) { toast(I18N.t('toast.copied')); await loadProfiles(); }
+  else if (r.error) toast('✗ ' + r.error);
+});
 
 // ================= SNI Manager =================
 async function loadSni() {
@@ -270,60 +422,73 @@ $('#sniAddBtn').addEventListener('click', async () => {
   await loadSni();
 });
 
-// ================= VLESS / V2Ray =================
-async function loadVless() {
-  vlessCache = await window.waslah.vless.list();
-  renderVlessList();
-}
-function renderVlessList() {
-  const box = $('#vlessList');
-  if (!vlessCache.length) { box.innerHTML = `<div class="empty-state">—</div>`; return; }
-  box.innerHTML = vlessCache.map((v) => `
-    <div class="vless-row">
-      <div>
-        <div>${v.name}</div>
-        <div class="mono muted small">${v.parsed?.host || ''}${v.parsed?.port ? ':' + v.parsed.port : ''}</div>
+$('#sniTestRunBtn').addEventListener('click', async () => {
+  const host = $('#sniTestHost').value.trim();
+  const port = $('#sniTestPort').value || 443;
+  if (!host) return toast(I18N.t('toast.missingFields'));
+  const box = $('#sniTestResults');
+  const btn = $('#sniTestRunBtn');
+  btn.disabled = true;
+  box.innerHTML = `<div class="empty-state">${I18N.t('sni.testerRunning')}</div>`;
+  try {
+    const results = await window.waslah.sni.testAll(host, port);
+    box.innerHTML = results.map((r, i) => `
+      <div class="sni-test-row ${r.ok ? 'ok' : 'fail'}">
+        <span class="sni-test-rank">${r.ok ? i + 1 : '—'}</span>
+        <span class="mono" style="flex:1">${r.sni}</span>
+        <span class="ms">${r.ok ? r.ms + 'ms' : '✗'}</span>
+        ${r.ok ? `<button data-action="use-tested" data-host="${r.sni}">${I18N.t('sni.useAsDefault')}</button>` : ''}
       </div>
-      <div class="vless-actions">
-        <button data-action="del" data-id="${v.id}" data-icon="trash"></button>
-      </div>
-    </div>
-  `).join('');
-  applyIcons(box);
-  box.querySelectorAll('[data-action="del"]').forEach((b) => b.addEventListener('click', async () => {
-    await window.waslah.vless.delete(b.dataset.id); await loadVless();
-  }));
-}
-let vlessValidated = null;
-$('#vlessValidateBtn').addEventListener('click', async () => {
-  const raw = $('#vlessInput').value.trim();
-  const result = await window.waslah.vless.validate(raw);
-  const preview = $('#vlessPreview');
-  if (result.ok) {
-    vlessValidated = raw;
-    preview.className = 'quick-preview ok';
-    preview.textContent = '✓ ' + JSON.stringify(result.data).slice(0, 160);
-    $('#vlessSaveBtn').disabled = false;
-  } else {
-    vlessValidated = null;
-    preview.className = 'quick-preview err';
-    preview.textContent = '✗ ' + result.error;
-    $('#vlessSaveBtn').disabled = true;
+    `).join('') || `<div class="empty-state">—</div>`;
+    box.querySelectorAll('[data-action="use-tested"]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        await window.waslah.sni.save({ host: b.dataset.host });
+        await window.waslah.settings.update({ defaultSni: b.dataset.host });
+        $('#s_defaultsni').value = b.dataset.host;
+        toast(I18N.t('toast.sniSaved'));
+        await loadSni();
+      });
+    });
+  } catch (err) {
+    box.innerHTML = `<div class="empty-state">✗ ${err.message}</div>`;
+  } finally {
+    btn.disabled = false;
   }
 });
-$('#vlessSaveBtn').addEventListener('click', async () => {
-  if (!vlessValidated) return;
-  await window.waslah.vless.save({ name: 'VLESS ' + (vlessCache.length + 1), raw: vlessValidated });
-  toast(I18N.t('toast.profileSaved'));
-  $('#vlessInput').value = '';
-  $('#vlessPreview').textContent = '';
-  $('#vlessSaveBtn').disabled = true;
-  await loadVless();
+
+function prefillSniTesterFromProfile() {
+  const sniTestHost = $('#sniTestHost');
+  const sniTestPort = $('#sniTestPort');
+  if (sniTestHost && !sniTestHost.value.trim() && profilesCache[0]) {
+    sniTestHost.value = profilesCache[0].host;
+    sniTestPort.value = profilesCache[0].port;
+  }
+}
+
+// ================= Hotspot =================
+$('#hotspotOpenSettingsBtn').addEventListener('click', () => {
+  window.waslah.app.openExternal('ms-settings:network-mobilehotspot');
 });
-$('#vlessQrBtn').addEventListener('click', async () => {
-  const res = await window.waslah.vless.importQr();
-  if (res.ok) { $('#vlessInput').value = res.text; toast(I18N.t('toast.copied')); }
-  else if (res.error) toast('✗ ' + res.error);
+$('#hotspotStartBtn').addEventListener('click', async () => {
+  const ssid = $('#hs_ssid').value.trim();
+  const pass = $('#hs_pass').value;
+  const resEl = $('#hotspotResult');
+
+  if (!ssid) return (resEl.textContent = '✗ ' + I18N.t('hotspot.errNoSsid'));
+  if (!pass || pass.length < 8) return (resEl.textContent = '✗ ' + I18N.t('hotspot.errShortPassword'));
+
+  resEl.textContent = '...';
+  const r = await window.waslah.hotspot.start(ssid, pass);
+  if (r.ok) {
+    resEl.textContent = `${r.hostedNetwork}\n${r.ics}`;
+  } else {
+    resEl.textContent = '✗ ' + r.error;
+  }
+});
+$('#hotspotStopBtn').addEventListener('click', async () => {
+  const resEl = $('#hotspotResult');
+  const r = await window.waslah.hotspot.stop();
+  resEl.textContent = r.ok ? r.result : '✗ ' + r.error;
 });
 
 // ================= Network tools =================
@@ -341,11 +506,19 @@ function bindTool(btnId, resultId, fn, formatter) {
 }
 
 bindTool('#toolMyIpBtn', '#toolMyIpResult', () => window.waslah.net.whatsMyIp(), (d) => d.ok ? d.ip : '✗ ' + d.error);
-bindTool('#toolDnsBtn', '#toolDnsResult', () => window.waslah.net.dnsLookup($('#toolDnsHost').value.trim()));
+bindTool('#toolDnsBtn', '#toolDnsResult', () => window.waslah.net.dnsLookup($('#toolDnsHost').value.trim()), (d) => {
+  const lines = [];
+  ['A', 'AAAA', 'CNAME', 'MX', 'TXT'].forEach((k) => {
+    if (d[k] && d[k].length) lines.push(`${k}:\n  ${d[k].join('\n  ')}`);
+  });
+  return lines.length ? lines.join('\n\n') : 'No records found';
+});
 bindTool('#toolTcpBtn', '#toolTcpResult', () => window.waslah.net.tcpPing($('#toolTcpHost').value.trim(), $('#toolTcpPort').value || 443), (d) => d.ok ? `✓ ${d.ms}ms` : `✗ ${d.error}`);
 bindTool('#toolHttpBtn', '#toolHttpResult', () => window.waslah.net.httpPing($('#toolHttpUrl').value.trim()), (d) => d.ok ? `✓ HTTP ${d.status} — ${d.ms}ms` : `✗ ${d.error}`);
 bindTool('#toolScanBtn', '#toolScanResult', () => {
   const [start, end] = $('#toolScanRange').value.split('-').map((x) => Number(x.trim()));
+  if (!start || !end || end < start) throw new Error('Enter a valid range like 20-100');
+  if (end - start + 1 > 1000) throw new Error('Max 1000 ports per scan — narrow the range');
   return window.waslah.net.portScan($('#toolScanHost').value.trim(), start, end);
 }, (ports) => ports.length ? `Open: ${ports.join(', ')}` : 'No open ports found');
 bindTool('#toolTraceBtn', '#toolTraceResult', () => window.waslah.net.traceroute($('#toolTraceHost').value.trim()), (t) => t);
@@ -353,6 +526,18 @@ bindTool('#toolSslBtn', '#toolSslResult', () => window.waslah.net.sslCheck($('#t
   `Subject: ${c.subject?.CN}\nIssuer: ${c.issuer?.O || c.issuer?.CN}\nValid: ${c.validFrom} → ${c.validTo}\nProtocol: ${c.protocol}`
 );
 bindTool('#toolWhoisBtn', '#toolWhoisResult', () => window.waslah.net.whois($('#toolWhoisHost').value.trim()), (t) => t);
+bindTool('#toolSpeedBtn', '#toolSpeedResult', () => window.waslah.net.speedTest(), (r) => `⬇ ${r.mbps} Mbps — ${(r.bytes / 1e6).toFixed(1)} MB in ${r.seconds}s${r.partial ? ' (partial)' : ''}`);
+
+$('#backupExportBtn').addEventListener('click', async () => { const r = await window.waslah.backup.export(); if (r.ok) toast(I18N.t('toast.copied')); });
+$('#backupImportBtn').addEventListener('click', async () => {
+  const r = await window.waslah.backup.import();
+  if (r.ok) { toast(I18N.t('toast.copied')); await loadProfiles(); await loadSni(); await loadSettings(); }
+});
+$('#settingsResetBtn').addEventListener('click', async () => {
+  await window.waslah.backup.resetSettings();
+  await loadSettings();
+  toast(I18N.t('toast.copied'));
+});
 
 $('#toolB64EncodeBtn').addEventListener('click', () => {
   $('#toolB64Result').textContent = btoa(unescape(encodeURIComponent($('#toolB64Input').value)));
@@ -415,6 +600,7 @@ function applyState(payload) {
 }
 function startUptimeTimer() {
   stopUptimeTimer();
+  const interval = currentSettings?.powerSavingMode ? 3000 : 1000;
   uptimeTimer = setInterval(async () => {
     const status = await window.waslah.conn.status();
     const s = Math.floor((status.uptimeMs || 0) / 1000);
@@ -424,7 +610,7 @@ function startUptimeTimer() {
     $('#statUptime').textContent = `${hh}:${mm}:${ss}`;
     $('#statDown').textContent = formatBytes(status.bytesIn);
     $('#statUp').textContent = formatBytes(status.bytesOut);
-  }, 1000);
+  }, interval);
 }
 function stopUptimeTimer() {
   if (uptimeTimer) clearInterval(uptimeTimer);
@@ -443,7 +629,9 @@ $('#connectBtn').addEventListener('click', async () => {
     await window.waslah.conn.disconnect();
   } else {
     if (!selectedProfileId) return toast(I18N.t('toast.pickProfile'));
-    try { await window.waslah.conn.connect(selectedProfileId); }
+    const sniSelectValue = $('#dashboardSniSelect').value;
+    const sniOverride = sniSelectValue === '__custom__' ? $('#dashboardSniCustomInput').value.trim() : sniSelectValue;
+    try { await window.waslah.conn.connect(selectedProfileId, sniOverride || null); }
     catch (err) { toast('✗ ' + err.message); }
   }
 });
@@ -517,6 +705,10 @@ async function loadSettings() {
   $('#s_reconnect').checked = !!currentSettings.reconnect?.enabled;
   $('#s_autoconnect').checked = !!currentSettings.autoConnectLastProfile;
   $('#s_autostart').checked = !!currentSettings.autoStartWindows;
+  $('#s_minimizetray').checked = currentSettings.minimizeToTrayOnClose !== false;
+  $('#s_notifications').checked = currentSettings.showNotifications !== false;
+  $('#s_powersaving').checked = !!currentSettings.powerSavingMode;
+  $('#s_autofailover').checked = !!currentSettings.autoFailoverSni;
   $('#s_maxretries').value = currentSettings.reconnect?.maxRetries ?? 5;
   $('#logEnabledToggle').checked = currentSettings.loggingEnabled !== false;
   applyTheme(currentSettings.theme || 'dark');
@@ -555,15 +747,15 @@ $$('.link-btn').forEach((btn) => btn.addEventListener('click', () => window.wasl
 // ================= Init =================
 (async function init() {
   const settings = await window.waslah.settings.get();
-  await applyLanguage(settings.language || 'ar');
+  await applyLanguage(settings.language || 'en');
   applyIcons();
 
   await loadProfiles();
   await loadSni();
-  await loadVless();
   await loadProviders();
   await loadSettings();
   renderLogCategoryOptions();
+  prefillSniTesterFromProfile();
 
   const initialLogs = await window.waslah.logs.list({ limit: 5 });
   recentLogEntries = initialLogs;
@@ -572,4 +764,7 @@ $$('.link-btn').forEach((btn) => btn.addEventListener('click', () => window.wasl
   const status = await window.waslah.conn.status();
   applyState(status);
   $('#appVersion').textContent = await window.waslah.app.getVersion();
+
+  const elevation = await window.waslah.elevation.check();
+  applyElevation(elevation);
 })();

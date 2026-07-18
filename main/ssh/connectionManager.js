@@ -4,6 +4,7 @@ const { EventEmitter } = require('events');
 const { SSHTunnel } = require('./sshTunnel');
 const { LocalSocksProxy } = require('./socksProxy');
 const { VpnManager } = require('./vpnManager');
+const { testSniBulk, SEED_SNI_CANDIDATES } = require('../net/sniTester');
 
 const SOCKS_PORT = 10808;
 
@@ -37,7 +38,7 @@ class ConnectionManager extends EventEmitter {
 
   async connect(profile, settings) {
     if (this.state === 'connecting' || this.state === 'connected' || this.state === 'reconnecting') {
-      this._log('[manager] فيه اتصال شغال أو جاري بالفعل — اتجاهلت المحاولة المكررة');
+      this._log('[manager] A connection is already active or in progress — ignored duplicate attempt');
       return;
     }
     this.profile = profile;
@@ -48,7 +49,7 @@ class ConnectionManager extends EventEmitter {
 
   async _doConnect() {
     this._setState('connecting');
-    this._log(`[manager] بنحاول نتصل بـ ${this.profile.host}:${this.profile.port}...`);
+    this._log(`[manager] Attempting to connect to ${this.profile.host}:${this.profile.port}...`);
 
     this.tunnel = new SSHTunnel(this.profile);
     this.tunnel.on('log', (l) => this._log(l));
@@ -69,7 +70,7 @@ class ConnectionManager extends EventEmitter {
           this.connectedAt = Date.now();
           this._setState('connected');
         } catch (err) {
-          this._log(`[manager] فشل تجهيز الـ VPN: ${err.message}`);
+          this._log(`[manager] Failed to set up VPN: ${err.message}`);
           this._setState('error', err.message);
           await this._handleDrop();
         }
@@ -96,15 +97,43 @@ class ConnectionManager extends EventEmitter {
     if (rc.enabled && this.retries < rc.maxRetries && this.state !== 'disconnecting') {
       this.retries += 1;
       this._setState('reconnecting', { attempt: this.retries, max: rc.maxRetries });
-      this._log(`[manager] هنحاول نعيد الاتصال (محاولة ${this.retries}/${rc.maxRetries})...`);
+
+      if (this.settings?.autoFailoverSni) {
+        await this._tryFailoverSni();
+      }
+
+      this._log(`[manager] Retrying connection (attempt ${this.retries}/${rc.maxRetries})...`);
       await this._cleanup({ keepVpnDown: true });
       this.reconnectTimer = setTimeout(() => {
         this.reconnectTimer = null;
         this._doConnect();
       }, rc.intervalMs);
     } else {
-      this._log('[manager] الاتصال اتقطع نهائيًا');
+      this._log('[manager] Connection permanently lost');
       await this.disconnect();
+    }
+  }
+
+  /**
+   * When auto-failover is enabled and a connection drops, tests the
+   * saved SNI list + seed candidates against this profile's host live,
+   * and swaps in the best-performing one before the next retry — instead
+   * of the user having to notice the drop, open SNI Manager, and pick a
+   * new one manually.
+   */
+  async _tryFailoverSni() {
+    try {
+      this._log('[manager] Auto-failover: testing SNI candidates before retry...');
+      const results = await testSniBulk(this.profile.host, this.profile.port, SEED_SNI_CANDIDATES);
+      const best = results.find((r) => r.ok);
+      if (best && best.sni !== this.profile.sni) {
+        this._log(`[manager] Auto-failover: switching SNI to ${best.sni} (${best.ms}ms)`);
+        this.profile.sni = best.sni;
+      } else if (!best) {
+        this._log('[manager] Auto-failover: no working SNI candidate found, retrying with current settings');
+      }
+    } catch (err) {
+      this._log(`[manager] Auto-failover test failed: ${err.message}`);
     }
   }
 

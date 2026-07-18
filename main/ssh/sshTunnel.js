@@ -44,24 +44,24 @@ class SSHTunnel extends EventEmitter {
       this.status = 'connected';
       this.connectedAt = Date.now();
       this.emit('status', this.status);
-      this.emit('log', `[ssh] متصل بنجاح بـ ${host}:${port}`);
+      this.emit('log', `[ssh] Connected successfully to ${host}:${port}`);
     });
 
     conn.on('error', (err) => {
       this.status = 'error';
       this.emit('status', this.status, err.message);
-      this.emit('log', `[ssh] خطأ: ${err.message}`);
+      this.emit('log', `[ssh] Error: ${err.message}`);
     });
 
     conn.on('close', () => {
       this.status = this._manualClose ? 'closed' : 'error';
       this.emit('status', this.status);
-      this.emit('log', '[ssh] الاتصال اتقفل');
+      this.emit('log', '[ssh] Connection closed');
       this.emit('closed', { manual: this._manualClose });
     });
 
     if (sni) {
-      this.emit('log', `[tls] بفتح TLS handshake على ${host}:${port} بـ SNI=${sni}`);
+      this.emit('log', `[tls] Opening TLS handshake to ${host}:${port} with SNI=${sni}`);
       const socket = tls.connect(
         {
           host,
@@ -70,14 +70,14 @@ class SSHTunnel extends EventEmitter {
           rejectUnauthorized: false,
         },
         () => {
-          this.emit('log', '[tls] الـ handshake نجح، بسلّم الـ socket لـ SSH');
+          this.emit('log', '[tls] Handshake succeeded, handing socket to SSH');
           conn.connect({ ...sshOpts, sock: socket });
         }
       );
       socket.on('error', (err) => {
         this.status = 'error';
         this.emit('status', this.status, err.message);
-        this.emit('log', `[tls] خطأ: ${err.message}`);
+        this.emit('log', `[tls] Error: ${err.message}`);
       });
     } else {
       conn.connect({ ...sshOpts, host, port });
